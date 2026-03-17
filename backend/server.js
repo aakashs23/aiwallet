@@ -4,6 +4,7 @@ require("dotenv").config();
 
 const pool = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
+const authMiddleware = require("./middleware/authMiddleware");
 
 const app = express();
 
@@ -23,6 +24,13 @@ app.get("/test-db", async (req, res) => {
     console.error(err);
     res.status(500).send("Database connection error");
   }
+});
+
+app.get("/protected", authMiddleware, (req, res) => {
+  res.json({
+    message: "Access granted",
+    user: req.user
+  });
 });
 
 const PORT = process.env.PORT || 5000;
