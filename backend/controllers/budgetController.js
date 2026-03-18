@@ -37,3 +37,53 @@ exports.getBudgets = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+exports.getBudgetInsights = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // total spending per category
+    const spending = await pool.query(
+      `SELECT category, SUM(amount) as total_spent
+       FROM transactions
+       WHERE user_id = $1
+       GROUP BY category`,
+      [userId]
+    );
+
+    // budgets
+    const budgets = await pool.query(
+      `SELECT category, monthly_limit
+       FROM budgets
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    // convert budgets to map
+    const budgetMap = {};
+    budgets.rows.forEach(b => {
+      budgetMap[b.category] = Number(b.monthly_limit);
+    });
+
+    // compare
+    const insights = spending.rows.map(s => {
+      const category = s.category;
+      const spent = Number(s.total_spent);
+      const limit = budgetMap[category] || 0;
+
+      return {
+        category,
+        spent,
+        budget: limit,
+        status: spent > limit ? "Overspent" : "Within Budget",
+        difference: spent - limit
+      };
+    });
+
+    res.json(insights);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error");
+  }
+};
