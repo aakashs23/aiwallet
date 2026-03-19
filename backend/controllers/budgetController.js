@@ -71,6 +71,14 @@ exports.getBudgetInsights = async (req, res) => {
       const spent = Number(s.total_spent);
       const limit = budgetMap[category] || 0;
 
+      let message = "";
+
+      if (spent > limit) {
+        message = `You overspent on ${category} by ₹${spent - limit}`;
+      } else {
+        message = `You are within budget for ${category}. ₹${limit - spent} remaining`;
+      }
+
       return {
         category,
         spent,
