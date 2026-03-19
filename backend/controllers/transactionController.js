@@ -54,3 +54,60 @@ exports.deleteTransaction = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+exports.detectAnomalies = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // get transactions
+    const result = await pool.query(
+      `SELECT category, amount
+       FROM transactions
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    const transactions = result.rows;
+
+    // group by category
+    const categoryMap = {};
+
+    transactions.forEach(tx => {
+      const category = tx.category;
+      const amount = Number(tx.amount);
+
+      if (!categoryMap[category]) {
+        categoryMap[category] = [];
+      }
+
+      categoryMap[category].push(amount);
+    });
+
+    const anomalies = [];
+
+    // detect anomalies
+    for (let category in categoryMap) {
+      const amounts = categoryMap[category];
+
+      const avg =
+        amounts.reduce((a, b) => a + b, 0) / amounts.length;
+
+      amounts.forEach(amount => {
+        if (amount > avg * 2) {
+          anomalies.push({
+            category,
+            amount,
+            average: Math.round(avg),
+            message: `Unusual spending: You spent ₹${amount} on ${category}, average is ₹${Math.round(avg)}`
+          });
+        }
+      });
+    }
+
+    res.json(anomalies);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error");
+  }
+};
