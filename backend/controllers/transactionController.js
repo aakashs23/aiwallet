@@ -111,3 +111,75 @@ exports.detectAnomalies = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+exports.detectSubscriptions = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const result = await pool.query(
+      `SELECT merchant, amount, transaction_date
+       FROM transactions
+       WHERE user_id = $1
+       ORDER BY merchant, transaction_date`,
+      [userId]
+    );
+
+    const transactions = result.rows;
+
+    const grouped = {};
+
+    // group by merchant + amount
+    transactions.forEach(tx => {
+      const key = `${tx.merchant}-${tx.amount}`;
+
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+
+      grouped[key].push(new Date(tx.transaction_date));
+    });
+
+    const subscriptions = [];
+
+    for (let key in grouped) {
+      const dates = grouped[key];
+
+      if (dates.length < 2) continue;
+
+      // sort dates
+      dates.sort((a, b) => a - b);
+
+      // check intervals
+      let intervals = [];
+
+      for (let i = 1; i < dates.length; i++) {
+        const diffDays =
+          (dates[i] - dates[i - 1]) / (1000 * 60 * 60 * 24);
+
+        intervals.push(diffDays);
+      }
+
+      // check if intervals are ~30 days
+      const isMonthly = intervals.every(
+        d => d > 25 && d < 35
+      );
+
+      if (isMonthly) {
+        const [merchant, amount] = key.split("-");
+
+        subscriptions.push({
+          merchant,
+          amount,
+          billing_cycle: "monthly",
+          message: `${merchant} subscription detected (~₹${amount}/month)`
+        });
+      }
+    }
+
+    res.json(subscriptions);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error");
+  }
+};
