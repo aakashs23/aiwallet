@@ -1,9 +1,15 @@
 const pool = require("../config/db");
 const { v4: uuidv4 } = require("uuid");
+const categorizeTransaction = require("../utils/categorizer");
 
 exports.addTransaction = async (req, res) => {
   try {
-    const { amount, category, merchant } = req.body;
+    let { amount, category, merchant } = req.body;
+
+    // auto categorize if not provided
+    if (!category) {
+      category = categorizeTransaction(merchant);
+    }
     const userId = req.user.userId;
 
     const result = await pool.query(
