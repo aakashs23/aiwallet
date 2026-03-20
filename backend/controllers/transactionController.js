@@ -1,17 +1,27 @@
 const pool = require("../config/db");
 const { v4: uuidv4 } = require("uuid");
 const categorizeTransaction = require("../utils/categorizer");
+const axios = require("axios");
 
 exports.addTransaction = async (req, res) => {
   try {
     let { amount, category, merchant } = req.body;
 
-    // auto categorize if not provided
-    if (!category) {
-      category = categorizeTransaction(merchant);
-    }
-    const userId = req.user.userId;
+    // call ML service
+  if (!category) {
+    try {
+      const response = await axios.post("http://localhost:8000/predict", {
+        merchant
+      });
 
+      category = response.data.category;
+    } catch (err) {
+    category = "Other";
+    }
+  }
+  
+  const userId = req.user.userId;
+     
     const result = await pool.query(
       `INSERT INTO transactions (id, user_id, amount, category, merchant)
        VALUES ($1,$2,$3,$4,$5)
