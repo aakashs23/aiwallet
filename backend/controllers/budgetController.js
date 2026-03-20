@@ -95,3 +95,86 @@ exports.getBudgetInsights = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+exports.getFinancialScore = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    let score = 100;
+    let insights = [];
+
+    // 1. Check overspending
+    const spending = await pool.query(
+      `SELECT category, SUM(amount) as total
+       FROM transactions
+       WHERE user_id=$1
+       GROUP BY category`,
+      [userId]
+    );
+
+    const budgets = await pool.query(
+      `SELECT category, monthly_limit
+       FROM budgets
+       WHERE user_id=$1`,
+      [userId]
+    );
+
+    const budgetMap = {};
+    budgets.rows.forEach(b => {
+      budgetMap[b.category] = Number(b.monthly_limit);
+    });
+
+    spending.rows.forEach(s => {
+      const spent = Number(s.total);
+      const limit = budgetMap[s.category] || 0;
+
+      if (spent > limit) {
+        score -= 20;
+        insights.push(`Overspending in ${s.category}`);
+      }
+    });
+
+    // 2. Check anomalies
+    const anomalies = await pool.query(
+      `SELECT amount FROM transactions WHERE user_id=$1`,
+      [userId]
+    );
+
+    if (anomalies.rows.length > 5) {
+      score -= 10;
+      insights.push("Irregular spending patterns detected");
+    }
+
+    // 3. Check subscriptions count
+    const subs = await pool.query(
+      `SELECT COUNT(*) FROM transactions
+       WHERE user_id=$1 AND merchant IN ('Netflix','Spotify')`,
+      [userId]
+    );
+
+    if (Number(subs.rows[0].count) > 3) {
+      score -= 10;
+      insights.push("Too many subscriptions");
+    }
+
+    // ensure score not below 0
+    if (score < 0) score = 0;
+
+    res.json({
+      score,
+      status:
+        score > 80
+          ? "Excellent"
+          : score > 60
+          ? "Good"
+          : score > 40
+          ? "Average"
+          : "Poor",
+      insights
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error");
+  }
+};
