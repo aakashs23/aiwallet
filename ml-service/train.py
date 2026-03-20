@@ -1,8 +1,13 @@
 import pandas as pd
 import psycopg2
+from sklearn.pipeline import FeatureUnion
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
 import joblib
+from sklearn.pipeline import Pipeline
+
+word_vec = TfidfVectorizer(ngram_range=(1,2))
+char_vec = TfidfVectorizer(analyzer='char_wb', ngram_range=(3,5))
 
 # load data
 data = pd.read_csv("data.csv")
@@ -23,15 +28,18 @@ db_data = pd.read_sql(query, conn)
 full_data = pd.concat([data, db_data], ignore_index=True)
 
 # features & labels
-X = data["merchant"].str.lower()  # convert to lowercase
-y = data["category"]
+X = full_data["merchant"].str.lower()  # convert to lowercase
+y = full_data["category"]
 
 # convert text → numbers
-vectorizer = TfidfVectorizer()
+vectorizer = FeatureUnion([
+    ("word", word_vec),
+    ("char", char_vec)
+])
 X_vec = vectorizer.fit_transform(X)
 
 # train model
-model = MultinomialNB()
+model = LogisticRegression(max_iter=1000, C=2, solver="lbfgs")
 model.fit(X_vec, y)
 
 # save model
