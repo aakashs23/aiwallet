@@ -14,6 +14,12 @@ exports.addTransaction = async (req, res) => {
         merchant
       });
 
+      if (!amount || !merchant) {
+        return res.status(400).json({
+          message: "Amount and merchant are required"
+        });
+      }
+
       category = response.data.category;
     } catch (err) {
     category = "Other";

@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 import joblib
 
@@ -7,11 +7,11 @@ import joblib
 data = pd.read_csv("data.csv")
 
 # features & labels
-X = data["merchant"]
+X = data["merchant"].str.lower()  # convert to lowercase
 y = data["category"]
 
 # convert text → numbers
-vectorizer = CountVectorizer()
+vectorizer = TfidfVectorizer()
 X_vec = vectorizer.fit_transform(X)
 
 # train model
@@ -22,4 +22,4 @@ model.fit(X_vec, y)
 joblib.dump(model, "model.pkl")
 joblib.dump(vectorizer, "vectorizer.pkl")
 
-print("Model trained ✅")
+print("Model trained")
