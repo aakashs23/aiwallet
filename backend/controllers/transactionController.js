@@ -2,11 +2,13 @@ const pool = require("../config/db");
 const { v4: uuidv4 } = require("uuid");
 const categorizeTransaction = require("../utils/categorizer");
 const axios = require("axios");
+const ruleBasedCategory = require("../utils/categorizer");
 
 exports.addTransaction = async (req, res) => {
   try {
-    let { amount, category, merchant } = req.body;
-
+    const { amount, merchant } = req.body;
+    let category = ruleBasedCategory(merchant);
+  
     // call ML service
   if (!category) {
     try {

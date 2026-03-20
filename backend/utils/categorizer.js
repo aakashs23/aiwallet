@@ -21,3 +21,17 @@ function categorizeTransaction(merchant) {
 }
 
 module.exports = categorizeTransaction;
+
+function ruleBasedCategory(merchant) {
+  const lower = merchant.toLowerCase();
+
+  for (let category in keywordRules) {
+    for (let word of keywordRules[category]) {
+      if (lower.includes(word)) {
+        return category;
+      }
+    }
+  }
+
+  return null;
+}

@@ -9,15 +9,30 @@ pizza hut,Food
 starbucks,Food
 subway,Food
 burger king,Food
+swiggy payment,Food
+swiggy instamart,Food
+swiggy order,Food
+swiggy food,Food
+zomato order,Food
+zomato food,Food
 
 uber,Transport
 uber ride,Transport
 ola,Transport
 rapido,Transport
+bike,Transport
+scooty,Transport
 metro,Transport
 bus,Transport
 train,Transport
 irctc,Transport
+setc,Transport
+travels,Transport
+cordelia cruises,Transport
+lyft,Transport
+auto,Transport
+red taxi,Transport
+airport taxi,Transport
 
 amazon,Shopping
 flipkart,Shopping
@@ -36,6 +51,7 @@ dmart,Shopping
 bigbasket grocery,Shopping
 bigbasket order,Shopping
 bb instant,Shopping
+flipkart order,Shopping
 
 netflix,Entertainment
 spotify,Entertainment
@@ -43,6 +59,15 @@ youtube,Entertainment
 amazon prime,Entertainment
 hotstar,Entertainment
 zee5,Entertainment
+apple tv,Entertainment
+sony liv,Entertainment
+apple music,Entertainment
+gaana,Entertainment
+deezer,Entertainment
+jio saavn,Entertainment
+fancode,Entertainment
+f1,Entertainment
+espn,Entertainment
 
 electricity bill,Bills
 water bill,Bills
@@ -52,25 +77,57 @@ airtel,Bills
 jio,Bills
 vodafone,Bills
 bsnl,Bills
-
 rent,Bills
 maintenance,Bills
+tangedco,Bills
+indane,Bills
+bpc,Bills
+jio fiber,Bills
+airtel xstream,Bills
+
 
 apollo pharmacy,Health
 pharmacy,Health
 hospital,Health
 clinic,Health
-
 gym,Health
 cult fit,Health
+sams gym,Health
+slam fitness,Health
+fitness,Health
+
 
 school fees,Education
 college fees,Education
 udemy,Education
 coursera,Education
+psg college,Education
+srm university,Education
+psg cas,Education
+srm medical,Education
+textbook,Education
+enext,Education
+infinitum,Education
+chatgpt,Education
+gemini,Education
+claude,Education
 
 insurance,Finance
 mutual fund,Finance
 sip,Finance
 loan emi,Finance
 credit card,Finance
+amazon pay,Finance
+google pay,Finance
+gpay,Finance
+gp,Finance
+phonepe,Finance
+paytm,Finance
+bhim,Finance
+visa,Finance
+mastercard,Finance
+rupay,Finance
+icici,Finance
+hdfc,Finance
+sbi,Finance
+axis,Finance
