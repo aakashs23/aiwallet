@@ -7,6 +7,7 @@ const authRoutes = require("./routes/authRoutes");
 const authMiddleware = require("./middleware/authMiddleware");
 const transactionRoutes = require("./routes/transactionRoutes");
 const budgetRoutes = require("./routes/budgetRoutes");
+const mlRoutes = require("./routes/mlRoutes");
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/transactions", transactionRoutes);
 app.use("/budgets", budgetRoutes);
+app.use("/ml", mlRoutes);
 
 app.get("/", (req, res) => {
   res.send("AI Wallet API running 🚀");
