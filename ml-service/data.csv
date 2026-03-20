@@ -1,12 +1,66 @@
 merchant,category
 swiggy,Food
 zomato,Food
+uber eats,Food
 kfc,Food
+mcdonalds,Food
+dominos,Food
+pizza hut,Food
+starbucks,Food
+subway,Food
+burger king,Food
+
 uber,Transport
+uber ride,Transport
 ola,Transport
+rapido,Transport
+metro,Transport
+bus,Transport
+train,Transport
+irctc,Transport
+
 amazon,Shopping
 flipkart,Shopping
+myntra,Shopping
+ajio,Shopping
+meesho,Shopping
+nykaa,Shopping
+reliance trends,Shopping
+
 netflix,Entertainment
 spotify,Entertainment
-electricity,Bills
+youtube,Entertainment
+amazon prime,Entertainment
+hotstar,Entertainment
+zee5,Entertainment
+
+electricity bill,Bills
+water bill,Bills
+gas bill,Bills
+internet bill,Bills
+airtel,Bills
+jio,Bills
+vodafone,Bills
+bsnl,Bills
+
 rent,Bills
+maintenance,Bills
+
+apollo pharmacy,Health
+pharmacy,Health
+hospital,Health
+clinic,Health
+
+gym,Health
+cult fit,Health
+
+school fees,Education
+college fees,Education
+udemy,Education
+coursera,Education
+
+insurance,Finance
+mutual fund,Finance
+sip,Finance
+loan emi,Finance
+credit card,Finance
