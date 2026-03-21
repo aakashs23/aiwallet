@@ -1,5 +1,6 @@
+import os
 import pandas as pd
-import psycopg2
+from sqlalchemy import create_engine
 from sklearn.pipeline import FeatureUnion
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
@@ -10,19 +11,18 @@ word_vec = TfidfVectorizer(ngram_range=(1,2))
 char_vec = TfidfVectorizer(analyzer='char_wb', ngram_range=(3,5))
 
 # load data
-data = pd.read_csv("data.csv")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+data_path = os.path.join(BASE_DIR, "data.csv")
 
-# connect to postgres
-conn = psycopg2.connect(
-    dbname="ai_wallet",
-    user="postgres",
-    password="aiwallet",
-    host="localhost",
-    port="5432"
+data = pd.read_csv(data_path)
+
+# connect to postgres using SQLAlchemy
+engine = create_engine(
+    "postgresql://postgres:aiwallet@localhost:5432/ai_wallet"
 )
 
 query = "SELECT merchant, category FROM training_data;"
-db_data = pd.read_sql(query, conn)
+db_data = pd.read_sql(query, engine)
 
 # combine datasets
 full_data = pd.concat([data, db_data], ignore_index=True)
