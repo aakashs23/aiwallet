@@ -1,43 +1,60 @@
 const pool = require("../config/db");
 const { v4: uuidv4 } = require("uuid");
-const categorizeTransaction = require("../utils/categorizer");
 const axios = require("axios");
-const ruleBasedCategory = require("../utils/categorizer");
+const { ruleBasedCategory } = require("../utils/categorizer");
 
 exports.addTransaction = async (req, res) => {
   try {
     const { amount, merchant } = req.body;
-    let category = ruleBasedCategory(merchant);
-  
-    // call ML service
-  if (!category) {
-    try {
-      const response = await axios.post("http://localhost:8000/predict", {
-        merchant
+
+    if (!amount || !merchant) {
+      return res.status(400).json({
+        message: "Amount and merchant are required"
       });
-
-      if (!amount || !merchant) {
-        return res.status(400).json({
-          message: "Amount and merchant are required"
-        });
-      }
-
-      category = response.data.category;
-    } catch (err) {
-    category = "Other";
     }
-  }
-  
-  const userId = req.user.userId;
-     
-    const result = await pool.query(
+
+    const userId = req.user.userId;
+
+    let result = ruleBasedCategory(merchant);
+
+    // 🔥 If no rule match → call ML
+    if (!result) {
+      try {
+        const response = await axios.post("http://localhost:8000/predict", {
+          merchant
+        });
+
+        result = {
+          category: response.data.category,
+          confidence: response.data.confidence,
+          source: "ml",
+          reason: "Predicted using ML model"
+        };
+
+      } catch (err) {
+        result = {
+          category: "Other",
+          confidence: 0,
+          source: "fallback",
+          reason: "ML service failed"
+        };
+      }
+    }
+
+    // 🔥 Save to DB (for now without new columns)
+    const dbResult = await pool.query(
       `INSERT INTO transactions (id, user_id, amount, category, merchant)
        VALUES ($1,$2,$3,$4,$5)
        RETURNING *`,
-      [uuidv4(), userId, amount, category, merchant]
+      [uuidv4(), userId, amount, result.category, merchant]
     );
 
-    res.json(result.rows[0]);
+    res.json({
+      ...dbResult.rows[0],
+      confidence: result.confidence,
+      source: result.source,
+      reason: result.reason
+    });
 
   } catch (err) {
     console.error(err);
