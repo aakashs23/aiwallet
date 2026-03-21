@@ -9,6 +9,8 @@ const transactionRoutes = require("./routes/transactionRoutes");
 const budgetRoutes = require("./routes/budgetRoutes");
 const mlRoutes = require("./routes/mlRoutes");
 
+const { retrainModel } = require("./services/retrainService");
+
 const app = express();
 
 app.use(cors());
