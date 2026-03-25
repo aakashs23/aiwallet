@@ -41,7 +41,7 @@ exports.addTransaction = async (req, res) => {
         };
       }
     }
-    
+
     let needsFeedback = false;
 
     if (result.source === "ml" && result.confidence < 0.7) {
@@ -236,6 +236,49 @@ exports.detectSubscriptions = async (req, res) => {
     }
 
     res.json(subscriptions);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error");
+  }
+};
+
+exports.updateTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category } = req.body;
+
+    // 1️⃣ get existing transaction
+    const existing = await pool.query(
+      "SELECT * FROM transactions WHERE id=$1",
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
+    const transaction = existing.rows[0];
+
+    // 2️⃣ update category
+    const updated = await pool.query(
+      "UPDATE transactions SET category=$1 WHERE id=$2 RETURNING *",
+      [category, id]
+    );
+
+    // 3️⃣ 🔥 AUTO SEND TO ML TRAINING
+    try {
+      await axios.post("http://localhost:5000/ml/train", {
+        merchant: transaction.merchant,
+        category: category
+      });
+
+      console.log("📚 Sent to ML training");
+    } catch (err) {
+      console.error("❌ ML training failed:", err.message);
+    }
+
+    res.json(updated.rows[0]);
 
   } catch (err) {
     console.error(err);
