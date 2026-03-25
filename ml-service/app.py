@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 import joblib
 import os
+import numpy as np
 
 app = FastAPI()
 
@@ -33,21 +34,26 @@ def predict(data: dict):
 
     X = vectorizer.transform([merchant])
 
-    prediction = model.predict(X)[0]
     probs = model.predict_proba(X)[0]
+    classes = model.classes_
 
-    confidence = max(probs)
+    # top 2 predictions
+    top_indices = np.argsort(probs)[-2:][::-1]
 
-    # fallback logic
-    if confidence < 0.5:
-        return {
-            "category": "Other",
-            "confidence": float(confidence)
+    top_predictions = [
+        {
+            "category": classes[i],
+            "confidence": float(probs[i])
         }
+        for i in top_indices
+    ]
+
+    best = top_predictions[0]
 
     return {
-        "category": prediction,
-        "confidence": float(confidence)
+        "category": best["category"],
+        "confidence": best["confidence"],
+        "top_predictions": top_predictions
     }
 
 
