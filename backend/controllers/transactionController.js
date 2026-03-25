@@ -28,7 +28,8 @@ exports.addTransaction = async (req, res) => {
           category: response.data.category,
           confidence: response.data.confidence,
           source: "ml",
-          reason: "Predicted using ML model"
+          reason: "Predicted using ML model",
+          top_predictions: response.data.top_predictions
         };
 
       } catch (err) {
@@ -39,6 +40,12 @@ exports.addTransaction = async (req, res) => {
           reason: "ML service failed"
         };
       }
+    }
+    
+    let needsFeedback = false;
+
+    if (result.source === "ml" && result.confidence < 0.7) {
+      needsFeedback = true;
     }
 
     // 🔥 Save to DB (for now without new columns)
@@ -62,7 +69,9 @@ exports.addTransaction = async (req, res) => {
       ...dbResult.rows[0],
       confidence: result.confidence,
       source: result.source,
-      reason: result.reason
+      reason: result.reason,
+      needs_feedback: needsFeedback,
+      top_predictions: result.top_predictions || []
     });
 
   } catch (err) {
