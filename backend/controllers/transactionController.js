@@ -43,10 +43,19 @@ exports.addTransaction = async (req, res) => {
 
     // 🔥 Save to DB (for now without new columns)
     const dbResult = await pool.query(
-      `INSERT INTO transactions (id, user_id, amount, category, merchant)
-       VALUES ($1,$2,$3,$4,$5)
-       RETURNING *`,
-      [uuidv4(), userId, amount, result.category, merchant]
+      `INSERT INTO transactions 
+      (id, user_id, amount, category, merchant, confidence, source)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      RETURNING *`,
+      [
+        uuidv4(),
+        userId,
+        amount,
+        result.category,
+        merchant,
+        result.confidence,
+        result.source
+      ]
     );
 
     res.json({
