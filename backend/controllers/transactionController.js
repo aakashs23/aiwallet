@@ -44,7 +44,10 @@ exports.addTransaction = async (req, res) => {
 
     let needsFeedback = false;
 
-    if (result.source === "ml" && result.confidence < 0.7) {
+    if (
+      result.source === "ml" &&
+      (result.confidence < 0.6 || result.category === "Other")
+    ) {
       needsFeedback = true;
     }
 
@@ -65,13 +68,27 @@ exports.addTransaction = async (req, res) => {
       ]
     );
 
+    let suggestedOptions = [];
+
+    if (needsFeedback) {
+      if (result.top_predictions && result.top_predictions.length > 0) {
+        suggestedOptions = result.top_predictions.map(p => p.category);
+      }
+
+      // always add fallback
+      if (!suggestedOptions.includes("Other")) {
+        suggestedOptions.push("Other");
+      }
+    }
+
     res.json({
       ...dbResult.rows[0],
       confidence: result.confidence,
       source: result.source,
       reason: result.reason,
       needs_feedback: needsFeedback,
-      top_predictions: result.top_predictions || []
+      top_predictions: result.top_predictions || [],
+      suggested_options: suggestedOptions
     });
 
   } catch (err) {
