@@ -81,12 +81,45 @@ exports.addTransaction = async (req, res) => {
       }
     }
 
+    let confidenceLabel = "high";
+
+    if (result.confidence < 0.4) {
+      confidenceLabel = "low";
+    } else if (result.confidence < 0.6) {
+      confidenceLabel = "medium";
+    }
+
+    let message = "";
+
+    if (result.source === "rule") {
+      message = "Categorized using known merchant pattern";
+    } else if (result.source === "ml") {
+      message = "Categorized using AI prediction";
+    } else if (result.source === "memory") {
+      message = "Learned from your past corrections";
+    }
+
+    let feedbackMessage = "";
+
+    if (needsFeedback) {
+      feedbackMessage = "Not sure about this. Please confirm category.";
+    }
+
     res.json({
       ...dbResult.rows[0],
+
+      // AI fields
       confidence: result.confidence,
+      confidence_label: confidenceLabel,
       source: result.source,
       reason: result.reason,
+
+      // UX improvements
+      message: message,
       needs_feedback: needsFeedback,
+      feedback_message: feedbackMessage,
+
+      // suggestions
       top_predictions: result.top_predictions || [],
       suggested_options: suggestedOptions
     });
