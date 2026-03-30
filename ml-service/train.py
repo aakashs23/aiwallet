@@ -32,14 +32,20 @@ X = full_data["merchant"].str.lower()  # convert to lowercase
 y = full_data["category"]
 
 # convert text → numbers
-vectorizer = FeatureUnion([
-    ("word", word_vec),
-    ("char", char_vec)
-])
+vectorizer = TfidfVectorizer(
+    ngram_range=(1,3),   # was (1,2)
+    analyzer="char_wb",  # 🔥 character-level learning
+    min_df=1
+)
 X_vec = vectorizer.fit_transform(X)
 
+X = X.str.replace(r"[^a-zA-Z ]", "", regex=True)
+
 # train model
-model = LogisticRegression(max_iter=1000, C=2, solver="lbfgs")
+model = LogisticRegression(
+    max_iter=2000,
+    class_weight="balanced"   # 🔥 handles uneven data
+)
 model.fit(X_vec, y)
 
 # save model
@@ -47,3 +53,5 @@ joblib.dump(model, "model.pkl")
 joblib.dump(vectorizer, "vectorizer.pkl")
 
 print("Model trained with user data")
+print("Training samples:", len(X))
+print("Categories:", set(y))

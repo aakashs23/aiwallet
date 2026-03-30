@@ -11,7 +11,7 @@ function AddTransaction({ refresh }) {
       { amount, merchant },
       {
         headers: {
-          Authorization: "Bearer YOUR_TOKEN"
+          Authorization: "7f9c2c8c8c4f5e9e2a6d4d8c3f7a91b6c2e5a4f9d1e7b3c6a8f0d2c4e6b9a1f3"
         }
       }
     );
