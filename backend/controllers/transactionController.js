@@ -15,7 +15,27 @@ exports.addTransaction = async (req, res) => {
 
     const userId = req.user.userId;
 
-    let result = ruleBasedCategory(merchant);
+    let result = null;
+
+    // ✅ 1. MEMORY LAYER (FIRST PRIORITY)
+    const learned = await pool.query(
+      "SELECT category FROM training_data WHERE merchant=$1 LIMIT 1",
+      [merchant.toLowerCase()]
+    );
+
+    if (learned.rows.length > 0) {
+      result = {
+        category: learned.rows[0].category,
+        confidence: 1.0,
+        source: "memory",
+        reason: "Learned from your past corrections"
+      };
+    }
+
+    // ✅ 2. RULE-BASED (SECOND)
+    if (!result) {
+      result = ruleBasedCategory(merchant);
+    }
 
     // 🔥 If no rule match → call ML
     if (!result) {
@@ -318,10 +338,13 @@ exports.updateTransaction = async (req, res) => {
 
     // 3️⃣ 🔥 AUTO SEND TO ML TRAINING
     try {
-      await axios.post("http://localhost:5000/ml/train", {
-        merchant: transaction.merchant,
-        category: category
-      });
+      
+      const base = transaction.merchant.toLowerCase();
+      await axios.post("http://localhost:5000/ml/train", [
+        { merchant: base, category },
+        { merchant: base + " payment", category },
+        { merchant: base + " order", category }
+      ]);
 
       console.log("📚 Sent to ML training");
     } catch (err) {

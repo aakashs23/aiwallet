@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const { saveTrainingData } = require("../controllers/mlController");
+const { saveTrainingData, trainModel } = require("../controllers/mlController");
 const { retrainModel } = require("../services/retrainService");
 
-router.post("/train", saveTrainingData);
+router.post("/train", trainModel);
+router.post("/save", saveTrainingData);
 
 router.post("/retrain", (req, res) => {
   retrainModel();
