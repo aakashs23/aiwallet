@@ -1,5 +1,6 @@
 import Transactions from "./components/Transactions";
 import AddTransaction from "./components/AddTransaction";
+import Analytics from "./components/Analytics";
 import "./App.css";
 
 function App() {
@@ -17,6 +18,9 @@ function App() {
 
       {/* 📊 Transactions List */}
       <Transactions />
+
+      {/* 📈 Analytics Dashboard */}
+      <Analytics />
 
     </div>
   );
