@@ -8,6 +8,7 @@ const authMiddleware = require("./middleware/authMiddleware");
 const transactionRoutes = require("./routes/transactionRoutes");
 const budgetRoutes = require("./routes/budgetRoutes");
 const mlRoutes = require("./routes/mlRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 const { retrainModel } = require("./services/retrainService");
 
@@ -16,6 +17,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/auth", authRoutes);
+app.use("/analytics", analyticsRoutes);
 app.use("/transactions", transactionRoutes);
 app.use("/budgets", budgetRoutes);
 app.use("/ml", mlRoutes);
