@@ -3,11 +3,11 @@ import axios from "axios";
 
 function Transactions() {
   const [transactions, setTransactions] = useState([]);
-
+  const token = localStorage.getItem("token");
   const fetchTransactions = async () => {
     const res = await axios.get("http://localhost:5000/transactions", {
       headers: {
-        Authorization: "Bearer YOUR_TOKEN"
+        Authorization: `Bearer ${token}`
       }
     });
 
