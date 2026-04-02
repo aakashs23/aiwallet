@@ -10,14 +10,25 @@ const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 function Analytics() {
   const [categoryData, setCategoryData] = useState([]);
   const [monthlyData, setMonthlyData] = useState([]);
-
+  const token = localStorage.getItem("token");
   const fetchAnalytics = async () => {
+  try {
     const headers = {
-      Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3MWVjNzZlYS04Y2Y3LTRhNjctYmMwNC1kMWZiNmI2OTBmNWUiLCJpYXQiOjE3NzUwNDQxNTAsImV4cCI6MTc3NTA0Nzc1MH0.Mvdt1PEnbmiaX9opWhRNPEknpYFhy3dZcCMCndv91kw"
+      Authorization: `Bearer ${token}`
     };
 
-    const catRes = await axios.get("http://localhost:5000/analytics/categories", { headers });
-    const monRes = await axios.get("http://localhost:5000/analytics/monthly", { headers });
+    const catRes = await axios.get(
+      "http://localhost:5000/analytics/categories",
+      { headers }
+    );
+
+    const monRes = await axios.get(
+      "http://localhost:5000/analytics/monthly",
+      { headers }
+    );
+
+    console.log("CATEGORY:", catRes.data);
+    console.log("MONTHLY:", monRes.data);
 
     setCategoryData(
       catRes.data.map(item => ({
@@ -32,7 +43,11 @@ function Analytics() {
         total: Number(item.total)
       }))
     );
-  };
+
+  } catch (err) {
+    console.error("ANALYTICS ERROR:", err);
+  }
+};
 
   useEffect(() => {
     fetchAnalytics();

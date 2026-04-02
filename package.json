@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "node-cron": "^4.2.1",
+    "react-router-dom": "^7.13.2",
     "recharts": "^3.8.1"
   }
 }
