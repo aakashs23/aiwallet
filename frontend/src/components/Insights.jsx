@@ -31,19 +31,17 @@ function Insights() {
         <p>No insights available yet</p>
       )}
 
-      {insights.map((insight, index) => (
-        <div
-          key={index}
-          style={{
-            padding: "15px",
-            marginBottom: "10px",
-            borderRadius: "10px",
-            backgroundColor: "#f5f5f5",
-            borderLeft: "5px solid #4CAF50",
-            boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
-          }}
-        >
-          {insight}
+      {insights.map((i, index) => (
+        <div key={index} style={{
+          padding: "10px",
+          marginBottom: "10px",
+          borderRadius: "8px",
+          background:
+            i.priority === "high" ? "#ffe6e6" :
+            i.priority === "medium" ? "#fff4e6" :
+            "#f0f0f0"
+        }}>
+          <p>{i.message}</p>
         </div>
       ))}
     </div>
