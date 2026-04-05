@@ -62,16 +62,36 @@ exports.addTransaction = async (req, res) => {
       }
     }
 
-    // ✅ fallback reason safety
-    const finalReason = result.reason || merchant || "Auto-detected";
+    // ✅ Get user history
+    const historyRes = await pool.query(
+      `SELECT category FROM transactions 
+      WHERE user_id=$1 
+      ORDER BY transaction_date DESC 
+      LIMIT 5`,
+      [userId]
+    );
 
-    let needsFeedback = false;
+    const userHistory = historyRes.rows.map(r => r.category);
 
-    if (
-      result.source === "ml" &&
-      (result.confidence < 0.6 || result.category === "Other")
-    ) {
-      needsFeedback = true;
+    // 🔥 LLM fallback
+    if (!result || result.confidence < 0.6) {
+      try {
+        const llmRes = await axios.post("http://localhost:5000/llm/classify", {
+          merchant,
+          amount,
+          userHistory
+        });
+
+        result = {
+          category: llmRes.data.category,
+          confidence: llmRes.data.confidence,
+          source: "llm",
+          reason: llmRes.data.reason
+        };
+
+      } catch (err) {
+        console.error("LLM fallback failed:", err.message);
+      }
     }
 
     // 🔥 FIXED INSERT (reason included)

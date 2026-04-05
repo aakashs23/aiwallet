@@ -13,6 +13,8 @@ const analyticsRoutes = require("./routes/analyticsRoutes");
 const insightsRoutes = require("./routes/insightsRoutes");
 const { retrainModel } = require("./services/retrainService");
 
+const llmRoutes = require("./routes/llmRoutes");
+
 const app = express();
 
 app.use(cors());
@@ -23,6 +25,7 @@ app.use("/transactions", transactionRoutes);
 app.use("/budgets", budgetRoutes);
 app.use("/ml", mlRoutes);
 app.use("/insights", insightsRoutes);
+app.use("/llm", llmRoutes);
 
 app.get("/", (req, res) => {
   res.send("AI Wallet API running 🚀");
