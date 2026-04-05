@@ -6,11 +6,21 @@ exports.setBudget = async (req, res) => {
     const { category, monthly_limit, month, year } = req.body;
     const userId = req.user.userId;
 
+    if (!category || monthly_limit == null || Number.isNaN(Number(monthly_limit))) {
+      return res.status(400).json({
+        message: "Category and a valid monthly limit are required"
+      });
+    }
+
+    const budgetMonth = month || new Date().getMonth() + 1;
+    const budgetYear = year || new Date().getFullYear();
+    const numericLimit = Number(monthly_limit);
+
     const result = await pool.query(
       `INSERT INTO budgets (id, user_id, category, monthly_limit, month, year)
        VALUES ($1,$2,$3,$4,$5,$6)
        RETURNING *`,
-      [uuidv4(), userId, category, monthly_limit, month, year]
+      [uuidv4(), userId, category, numericLimit, budgetMonth, budgetYear]
     );
 
     res.json(result.rows[0]);
@@ -25,16 +35,40 @@ exports.getBudgets = async (req, res) => {
   try {
     const userId = req.user.userId;
 
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
     const result = await pool.query(
-      "SELECT * FROM budgets WHERE user_id=$1",
-      [userId]
+      `SELECT 
+        b.id,
+        b.user_id,
+        b.category,
+        b.monthly_limit,
+        b.month,
+        b.year,
+        b.created_at,
+        COALESCE(SUM(t.amount), 0) as spent
+      FROM budgets b
+      LEFT JOIN transactions t
+      ON LOWER(b.category) = LOWER(t.category)
+      AND t.user_id = b.user_id
+      AND EXTRACT(MONTH FROM t.transaction_date) = $2
+      AND EXTRACT(YEAR FROM t.transaction_date) = $3
+      WHERE b.user_id = $1
+      AND b.month = $2
+      AND b.year = $3
+      GROUP BY 
+        b.id, b.user_id, b.category, 
+        b.monthly_limit, b.month, b.year, b.created_at`,
+      [userId, month, year]
     );
 
     res.json(result.rows);
 
   } catch (err) {
     console.error(err);
-    res.status(500).send("Server error");
+    res.status(500).json({ message: "Error fetching budgets" });
   }
 };
 

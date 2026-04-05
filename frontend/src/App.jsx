@@ -4,7 +4,7 @@ import Transactions from "./components/Transactions";
 import AddTransaction from "./components/AddTransaction";
 import Analytics from "./components/Analytics";
 import Insights from "./components/Insights";
-
+import Budgets from "./components/Budgets";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
@@ -55,7 +55,8 @@ function App() {
         <Link to="/insights">Insights</Link> |{" "}
         <Link to="/about">About</Link> |{" "}
         <Link to="/login">Login</Link> |{" "}
-        <Link to="/register">Register</Link>
+        <Link to="/register">Register</Link> |{" "}
+        <Link to="/budgets">Budgets</Link>
       </nav>
 
       {/* 🧭 ROUTES */}
@@ -93,11 +94,35 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        <Route path="/about" element={<About />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route 
+          path="/about" 
+          element={
+            <ProtectedRoute>
+              <About />
+            </ProtectedRoute> 
+          }
+        />
+        <Route 
+          path="/login" 
+          element={
+            <Login />
+          }
+        />
+        <Route 
+          path="/register" 
+          element={
+            <Register />
+          } 
+        />
+        <Route 
+          path="/budgets" 
+          element={
+            <ProtectedRoute>
+              <Budgets />
+            </ProtectedRoute>
+          } 
+        />
       </Routes>
-
     </div>
   );
 }
