@@ -1,53 +1,37 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import {
-  PieChart, Pie, Cell, Tooltip,
-  LineChart, Line, XAxis, YAxis, CartesianGrid
-} from "recharts";
-
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
 function Analytics() {
-  const [categoryData, setCategoryData] = useState([]);
-  const [monthlyData, setMonthlyData] = useState([]);
+  const [topMerchants, setTopMerchants] = useState([]);
+  const [savingsRate, setSavingsRate] = useState(0);
+  const [score, setScore] = useState(0);
+  const [trends, setTrends] = useState([]);
+
   const token = localStorage.getItem("token");
+
   const fetchAnalytics = async () => {
-  try {
-    const headers = {
-      Authorization: `Bearer ${token}`
-    };
+    try {
+      const headers = {
+        Authorization: `Bearer ${token}`
+      };
 
-    const catRes = await axios.get(
-      "http://localhost:5000/analytics/categories",
-      { headers }
-    );
+      const [merchantsRes, savingsRes, scoreRes, trendsRes] =
+        await Promise.all([
+          axios.get("http://localhost:5000/analytics/top-merchants", { headers }),
+          axios.get("http://localhost:5000/analytics/savings-rate", { headers }),
+          axios.get("http://localhost:5000/analytics/financial-score", { headers }),
+          axios.get("http://localhost:5000/analytics/category-trends", { headers })
+        ]);
 
-    const monRes = await axios.get(
-      "http://localhost:5000/analytics/monthly",
-      { headers }
-    );
+      setTopMerchants(merchantsRes.data);
+      setSavingsRate(savingsRes.data.savingsRate);
+      setScore(scoreRes.data.score);
+      setTrends(trendsRes.data);
 
-    console.log("CATEGORY:", catRes.data);
-    console.log("MONTHLY:", monRes.data);
-
-    setCategoryData(
-      catRes.data.map(item => ({
-        name: item.category,
-        value: Number(item.total)
-      }))
-    );
-
-    setMonthlyData(
-      monRes.data.map(item => ({
-        month: new Date(item.month).toLocaleDateString("en-US", { month: "short" }),
-        total: Number(item.total)
-      }))
-    );
-
-  } catch (err) {
-    console.error("ANALYTICS ERROR:", err);
-  }
-};
+    } catch (err) {
+      console.error("Analytics error:", err);
+    }
+  };
 
   useEffect(() => {
     fetchAnalytics();
@@ -55,35 +39,71 @@ function Analytics() {
 
   return (
     <div style={{ marginTop: 40 }}>
+      <h2>📊 Advanced Analytics</h2>
 
-      <h2>📊 Analytics Dashboard</h2>
+      {/* 💯 Financial Score */}
+      <div style={{
+        padding: "20px",
+        marginBottom: "20px",
+        borderRadius: "10px",
+        background: "#f0f8ff",
+        textAlign: "center"
+      }}>
+        <h3>Financial Health Score</h3>
+        <h1>{score}/100</h1>
+      </div>
 
-      {/* 🥧 Pie Chart */}
-      <h3>Spending by Category</h3>
-      <PieChart width={400} height={300}>
-        <Pie
-          data={categoryData}
-          dataKey="value"
-          nameKey="name"
-          outerRadius={100}
-        >
-          {categoryData.map((entry, index) => (
-            <Cell key={index} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip />
-      </PieChart>
+      {/* 💰 Savings Rate */}
+      <div style={{
+        padding: "15px",
+        marginBottom: "20px",
+        borderRadius: "10px",
+        background: "#e6ffe6"
+      }}>
+        <h3>Savings Rate</h3>
+        <p>{savingsRate}%</p>
+      </div>
 
-      {/* 📈 Line Chart */}
-      <h3>Monthly Spending</h3>
-      <LineChart width={500} height={300} data={monthlyData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="month" />
-        <YAxis />
-        <Tooltip />
-        <Line type="monotone" dataKey="total" stroke="#8884d8" />
-      </LineChart>
+      {/* 🏪 Top Merchants */}
+      <div style={{ marginBottom: "20px" }}>
+        <h3>Top Merchants</h3>
 
+        {topMerchants.map((m, index) => (
+          <div key={index} style={{
+            padding: "10px",
+            borderBottom: "1px solid #ddd"
+          }}>
+            <strong>{m.merchant}</strong>
+            <p>₹{Number(m.total)}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* 📈 Category Trends */}
+      <div>
+        <h3>Category Trends (Month vs Last Month)</h3>
+
+        {trends.map((t, index) => {
+          const change = Number(t.change);
+
+          return (
+            <div key={index} style={{
+              padding: "10px",
+              marginBottom: "10px",
+              borderRadius: "8px",
+              background:
+                change > 0 ? "#ffe6e6" :
+                change < 0 ? "#e6ffe6" :
+                "#f0f0f0"
+            }}>
+              <strong>{t.category}</strong>
+              <p>
+                {change > 0 ? "🔺" : change < 0 ? "🔻" : "➖"} {change}%
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
