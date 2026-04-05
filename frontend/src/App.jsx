@@ -24,7 +24,6 @@ function Home() {
 function Dashboard() {
   return (
     <>
-      <AddTransaction />
       <Transactions />
       <Analytics />
       <Insights />
@@ -74,9 +73,12 @@ function App() {
           path="/transactions" 
           element={
             <ProtectedRoute>
-              <Transactions />
-          </ProtectedRoute>
-          } 
+              <>
+                <AddTransaction />
+                  <Transactions />
+              </>
+            </ProtectedRoute>
+          }        
         />
         <Route 
           path="/analytics" 
