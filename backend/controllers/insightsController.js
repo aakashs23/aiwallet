@@ -125,8 +125,56 @@ exports.getInsights = async (req, res) => {
     // ✅ Return only messages (clean API)
     res.json(insights.map(i => i.message));
 
+    // 🧠 INSIGHT — Budget awareness
+    const budgetRes = await pool.query(
+      `SELECT b.category, b.monthly_limit,
+              COALESCE(SUM(t.amount), 0) as spent
+      FROM budgets b
+      LEFT JOIN transactions t
+      ON LOWER(b.category) = LOWER(t.category)
+      AND t.user_id = b.user_id
+      AND EXTRACT(MONTH FROM t.transaction_date) = $2
+      AND EXTRACT(YEAR FROM t.transaction_date) = $3
+      WHERE b.user_id = $1
+      AND b.month = $2
+      AND b.year = $3
+      GROUP BY b.category, b.monthly_limit`,
+      [userId, new Date().getMonth() + 1, new Date().getFullYear()]
+    );
+
+    const budgets = budgetRes.rows;
+
+    budgets.forEach(b => {
+      const spent = Number(b.spent) || 0;
+      const budgetLimit = Number(b.monthly_limit) || 0;
+
+      if (budgetLimit === 0) return;
+
+      const percent = (spent / budgetLimit) * 100;
+
+      // 🚨 Overspending
+      if (spent > budgetLimit) {
+        const excess = spent - budgetLimit;
+
+        insights.push({
+          type: "budget_alert",
+          priority: "high",
+          message: `You exceeded your ${b.category} budget by ₹${excess}`
+        });
+      }
+
+      // ⚠ Near limit warning
+      else if (percent > 80) {
+        insights.push({
+          type: "budget_warning",
+          priority: "medium",
+          message: `You are close to your ${b.category} budget (${percent.toFixed(1)}%)`
+        });
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error generating insights" });
   }
 };
+

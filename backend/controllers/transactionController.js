@@ -17,7 +17,7 @@ exports.addTransaction = async (req, res) => {
 
     let result = null;
 
-    // ✅ 1. MEMORY LAYER (FIRST PRIORITY)
+    // ✅ 1. MEMORY
     const learned = await pool.query(
       "SELECT category FROM training_data WHERE merchant=$1 LIMIT 1",
       [merchant.toLowerCase()]
@@ -32,12 +32,12 @@ exports.addTransaction = async (req, res) => {
       };
     }
 
-    // ✅ 2. RULE-BASED (SECOND)
+    // ✅ 2. RULE
     if (!result) {
       result = ruleBasedCategory(merchant);
     }
 
-    // 🔥 If no rule match → call ML
+    // ✅ 3. ML
     if (!result) {
       try {
         const response = await axios.post("http://localhost:8000/predict", {
@@ -48,7 +48,7 @@ exports.addTransaction = async (req, res) => {
           category: response.data.category,
           confidence: response.data.confidence,
           source: "ml",
-          reason: "Predicted using ML model",
+          reason: `Predicted from merchant "${merchant}"`,
           top_predictions: response.data.top_predictions
         };
 
@@ -62,6 +62,9 @@ exports.addTransaction = async (req, res) => {
       }
     }
 
+    // ✅ fallback reason safety
+    const finalReason = result.reason || merchant || "Auto-detected";
+
     let needsFeedback = false;
 
     if (
@@ -71,11 +74,11 @@ exports.addTransaction = async (req, res) => {
       needsFeedback = true;
     }
 
-    // 🔥 Save to DB (for now without new columns)
+    // 🔥 FIXED INSERT (reason included)
     const dbResult = await pool.query(
-      `INSERT INTO transactions 
-      (id, user_id, amount, category, merchant, confidence, source)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO transactions
+      (id, user_id, amount, category, merchant, confidence, source, reason)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       RETURNING *`,
       [
         uuidv4(),
@@ -84,7 +87,8 @@ exports.addTransaction = async (req, res) => {
         result.category,
         merchant,
         result.confidence,
-        result.source
+        result.source,
+        finalReason   // ✅ FIX HERE
       ]
     );
 
@@ -95,7 +99,6 @@ exports.addTransaction = async (req, res) => {
         suggestedOptions = result.top_predictions.map(p => p.category);
       }
 
-      // always add fallback
       if (!suggestedOptions.includes("Other")) {
         suggestedOptions.push("Other");
       }
@@ -128,18 +131,15 @@ exports.addTransaction = async (req, res) => {
     res.json({
       ...dbResult.rows[0],
 
-      // AI fields
       confidence: result.confidence,
       confidence_label: confidenceLabel,
       source: result.source,
-      reason: result.reason,
+      reason: finalReason, // ✅ ensure frontend gets it
 
-      // UX improvements
-      message: message,
+      message,
       needs_feedback: needsFeedback,
       feedback_message: feedbackMessage,
 
-      // suggestions
       top_predictions: result.top_predictions || [],
       suggested_options: suggestedOptions
     });
@@ -246,7 +246,7 @@ exports.detectSubscriptions = async (req, res) => {
     const userId = req.user.userId;
 
     const result = await pool.query(
-      `SELECT merchant, amount, transaction_date
+      `SELECT merchant, amount, transaction_date, reason
        FROM transactions
        WHERE user_id = $1
        ORDER BY merchant, transaction_date`,
