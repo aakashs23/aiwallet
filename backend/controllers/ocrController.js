@@ -30,6 +30,17 @@ exports.processReceipt = async (req, res) => {
 
     console.log("OCR TEXT:", rawText);
 
+    const historyResult = await pool.query(
+      `SELECT merchant, category, times_seen
+       FROM training_data
+       ORDER BY times_seen DESC, last_seen_at DESC
+       LIMIT 10`,
+    );
+    const userHistory = historyResult.rows.map(
+      r => `${r.merchant} → ${r.category} (seen ${r.times_seen}x)`
+    );
+    console.log("TRAINING HISTORY:", userHistory);
+
     // 🔥 FALLBACK AMOUNT EXTRACTION
     const amountMatch = rawText.match(/(total|amount)[^\d]*(\d+(\.\d+)?)/i);
     const fallbackAmount = amountMatch ? Number(amountMatch[2]) : 0;
@@ -69,12 +80,21 @@ exports.processReceipt = async (req, res) => {
       ]
     );
 
+    // 🧠 5. LEARNING LOOP — WRITE SIDE
+    // If this merchant was seen before → increment counter + update timestamp
+    // If new merchant → insert fresh row
     await pool.query(
-        `INSERT INTO training_data (id, merchant, category)
-        VALUES ($1, $2, $3)
-        ON CONFLICT DO NOTHING`,
-        [uuidv4(), extracted.merchant.toLowerCase(), result.category]
+      `INSERT INTO training_data (id, merchant, category, times_seen, last_seen_at)
+       VALUES ($1, $2, $3, 1, NOW())
+       ON CONFLICT (merchant)
+       DO UPDATE SET
+         times_seen   = training_data.times_seen + 1,
+         last_seen_at = NOW(),
+         category     = EXCLUDED.category`,
+      [uuidv4(), extracted.merchant.toLowerCase(), result.category]
     );
+
+    console.log("LEARNING LOOP: saved", extracted.merchant, "→", result.category);
 
     res.json({
       message: "Receipt processed successfully",
