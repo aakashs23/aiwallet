@@ -9,7 +9,7 @@ const transactionRoutes = require("./routes/transactionRoutes");
 const budgetRoutes = require("./routes/budgetRoutes");
 const mlRoutes = require("./routes/mlRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
-
+const ocrRoutes = require("./routes/ocrRoutes");
 const insightsRoutes = require("./routes/insightsRoutes");
 const { retrainModel } = require("./services/retrainService");
 
@@ -26,6 +26,7 @@ app.use("/budgets", budgetRoutes);
 app.use("/ml", mlRoutes);
 app.use("/insights", insightsRoutes);
 app.use("/llm", llmRoutes);
+app.use("/ocr", ocrRoutes);
 
 app.get("/", (req, res) => {
   res.send("AI Wallet API running 🚀");
