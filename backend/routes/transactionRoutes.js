@@ -9,9 +9,11 @@ const {
   addTransaction,
   getTransactions,
   deleteTransaction,
-  updateTransaction
+  updateTransaction,
+  bulkAddTransactions
 } = require("../controllers/transactionController");
 
+router.post("/bulk", authMiddleware, bulkAddTransactions);
 router.post("/", authMiddleware, addTransaction);
 router.get("/", authMiddleware, getTransactions);
 router.delete("/:id", authMiddleware, deleteTransaction);

@@ -378,3 +378,69 @@ exports.updateTransaction = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+exports.bulkAddTransactions = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { merchant, items } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        message: "Items array is required and must not be empty"
+      });
+    }
+
+    const savedTransactions = [];
+
+    for (const item of items) {
+      const { name, amount, category, confidence, reason } = item;
+
+      if (!amount || !category) {
+        continue;
+      }
+
+      try {
+        const dbResult = await pool.query(
+          `INSERT INTO transactions
+          (id, user_id, amount, category, merchant, confidence, source, reason)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          RETURNING *`,
+          [
+            uuidv4(),
+            userId,
+            amount,
+            category,
+            name || merchant || "Receipt Item",
+            confidence || 0.8,
+            "ocr",
+            reason || "From receipt scan"
+          ]
+        );
+
+        savedTransactions.push(dbResult.rows[0]);
+
+        // 🔥 AUTO SEND TO ML TRAINING
+        try {
+          const base = (name || merchant || "item").toLowerCase();
+          await axios.post("http://localhost:5000/ml/train", [
+            { merchant: base, category }
+          ]);
+        } catch (err) {
+          console.error("ML training failed:", err.message);
+        }
+
+      } catch (err) {
+        console.error("Error inserting item:", err.message);
+      }
+    }
+
+    res.json({
+      message: `Successfully saved ${savedTransactions.length} transactions`,
+      transactions: savedTransactions
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

@@ -12,8 +12,6 @@ exports.processReceipt = async (req, res) => {
     const imagePath = req.file.path;
     const processedPath = "uploads/processed-" + Date.now() + ".png";
 
-    const metadata = await sharp(imagePath).metadata();
-
     await sharp(imagePath)
         .grayscale()
         .normalize()
@@ -50,59 +48,41 @@ exports.processReceipt = async (req, res) => {
         .replace(/\s+/g, " ")           // normalize spaces
         .trim();
 
-    // 🧱 2. LLM PARSING & CLASSIFICATION (Gemini)
-    const classifyRes = await axios.post("http://localhost:5000/llm/classify", {
-      texts: rawText
+    // 🧱 2. PARSE RECEIPT (multi-item)
+    const parseRes = await axios.post("http://localhost:5000/llm/parse-receipt", {
+      text: rawText
     });
 
-    const llmResult = classifyRes.data;
+    const parsed = parseRes.data;
 
-    const extracted = llmResult.parsed;
-    const result = llmResult.classification;
+    // 🧱 3. CLASSIFY EACH ITEM
+    const items = [];
 
-    // 🧱 4. SAVE TRANSACTION
-    const dbResult = await pool.query(
-      `INSERT INTO transactions
-        (id, user_id, amount, category, merchant, confidence, source, reason, raw_text, cleaned_text)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-        RETURNING *`,
-      [
-        uuidv4(),
-        userId,
-        extracted.amount || fallbackAmount,
-        result.category,
-        extracted.merchant,
-        result.confidence,
-        "ocr+llm",
-        result.reason,
-        rawText,
-        cleanedText
-      ]
-    );
-
-    // 🧠 5. LEARNING LOOP — WRITE SIDE
-    // If this merchant was seen before → increment counter + update timestamp
-    // If new merchant → insert fresh row
-    await pool.query(
-      `INSERT INTO training_data (id, merchant, category, times_seen, last_seen_at)
-       VALUES ($1, $2, $3, 1, NOW())
-       ON CONFLICT (merchant)
-       DO UPDATE SET
-         times_seen   = training_data.times_seen + 1,
-         last_seen_at = NOW(),
-         category     = EXCLUDED.category`,
-      [uuidv4(), extracted.merchant.toLowerCase(), result.category]
-    );
-
-    console.log("LEARNING LOOP: saved", extracted.merchant, "→", result.category);
-
-    res.json({
-      message: "Receipt processed successfully",
-      rawText,
-      extracted,
-      classification: result,
-      transaction: dbResult.rows[0]
+    for (let item of parsed.items || []) {
+      const classifyRes = await axios.post("http://localhost:5000/llm/classify", {
+      merchant: item.name,
+      amount: item.amount,
+      userHistory
     });
+
+    const classification = classifyRes.data.classification;
+
+    items.push({
+      name: item.name,
+      amount: item.amount,
+      category: classification.category,
+      confidence: classification.confidence,
+      reason: classification.reason
+    });
+  }
+   
+  res.json({
+    merchant: parsed.merchant,
+    date: parsed.date,
+    total: parsed.total || fallbackAmount,
+    items,
+    rawText
+  }); 
 
   } catch (err) {
     console.error("OCR PIPELINE ERROR:", err);

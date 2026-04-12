@@ -166,25 +166,36 @@ exports.classifyTransaction = async (req, res) => {
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
+      
       const text = response.text();
 
       let parsed;
 
       try {
-        parsed = JSON.parse(text);
+        const clean = text
+        .replace(/```json|```/g, "")
+        .trim();
+
+        const start = clean.indexOf("{");
+        const end = clean.lastIndexOf("}");
+
+        if (start === -1 || end === -1) {
+          throw new Error("No JSON found");
+        }
+
+        const jsonString = clean.substring(start, end + 1);
+
+        parsed = JSON.parse(jsonString);
+
       } catch (err) {
         console.error("❌ JSON parse failed:", text);
 
         parsed = {
-          parsed: {
-            merchant: "Unknown",
-            amount: 0,
-            ocr_confidence: "low"
-          },
+          parsed: { merchant, amount },
           classification: {
             category: "Other",
             confidence: 0.5,
-            reason: "Fallback parsing failed"
+            reason: "Classification failed"
           }
         };
       }
@@ -288,7 +299,7 @@ It may contain:
 - Irrelevant noise: GSTIN, cashier ID, store address, loyalty points — ignore these
 
 ## TASK
-Parse the receipt and extract exactly three fields: merchant, amount, and date.
+Parse the receipt and extract the merchant, date, final total, and ALL purchased line items.
 
 ## OUTPUT CONTRACT
 Respond with ONLY a raw JSON object.
@@ -297,8 +308,14 @@ Respond with ONLY a raw JSON object.
 
 {
   "merchant": "<cleaned merchant/brand name, title case>",
-  "amount":   <final amount paid as a float, no currency symbols or commas>,
-  "date":     "<transaction date in YYYY-MM-DD format, or null if not found>"
+  "date":     "<transaction date in YYYY-MM-DD format, or null if not found>",
+  "total":    <final amount paid as a float, no currency symbols or commas>,
+  "items": [
+    {
+      "name":   "<cleaned item name>",
+      "amount": <item price as a float>
+    }
+  ]
 }
 
 ## FIELD EXTRACTION RULES
@@ -311,7 +328,7 @@ Respond with ONLY a raw JSON object.
 - Use title case: "APOLLO PHARMACY" → "Apollo Pharmacy"
 - If truly unidentifiable, return "Unknown"
 
-### amount  
+### total
 - Prefer labels in this priority order:
   1. "Grand Total" / "Grand Amt"
   2. "Net Payable" / "Net Amount" / "Amount Due"
@@ -326,11 +343,24 @@ Respond with ONLY a raw JSON object.
 - Prefer labels: "Date", "Bill Date", "Order Date", "Transaction Date", "Txn Date"
 - Parse any format into YYYY-MM-DD:
   "12/03/2025" → "2025-03-12"
-  "12-Mar-25"  → "2025-03-12"  
+  "12-Mar-25"  → "2025-03-12"
   "Mar 12 2025" → "2025-03-12"
   "20250312"   → "2025-03-12"
 - If day is ambiguous (e.g., "03/04/25"), prefer DD/MM/YY convention for Indian receipts
 - If no date found → return null
+
+### items
+- Extract EVERY purchased product/service line — include quantity suffixes in the name if present
+  e.g., "Milk 1L", "Garlic Naan x2", "Rice 5kg"
+- Strip ₹, Rs, INR, commas from amounts before parsing
+- EXCLUDE all of the following — they are NOT items:
+  - Tax lines: CGST, SGST, IGST, VAT, Cess
+  - Aggregates: Subtotal, Total, Grand Total, Net Payable, Amount Due
+  - Fees that are not products: Delivery Fee, Packaging Fee, Platform Fee, Service Charge
+  - Discounts / coupons / cashback lines
+  - Metadata: GSTIN, PNR, Order ID, Cashier, Loyalty Points
+- If a line has a name but no parseable amount → omit it
+- If no items can be identified → return an empty array []
 
 ## FEW-SHOT EXAMPLES
 
@@ -349,7 +379,7 @@ Grand Total            ₹398
 Date: 14-Jan-2025
 """
 Output:
-{"merchant":"Swiggy","amount":398.00,"date":"2025-01-14"}
+{"merchant":"Swiggy","date":"2025-01-14","total":398.00,"items":[{"name":"Butter Chicken","amount":280.00},{"name":"Garlic Naan x2","amount":80.00}]}
 
 ---
 
@@ -368,7 +398,7 @@ Net Payable: ₹448
 Bill Date: 03/02/25    Cashier: EMP-042
 """
 Output:
-{"merchant":"Reliance Fresh","amount":448.00,"date":"2025-02-03"}
+{"merchant":"Reliance Fresh","date":"2025-02-03","total":448.00,"items":[{"name":"Milk 1L","amount":62.00},{"name":"Bread","amount":45.00},{"name":"Rice 5kg","amount":320.00}]}
 
 ---
 
@@ -384,7 +414,7 @@ Total         ₹495.00
 Booking Date: 2025-03-22
 """
 Output:
-{"merchant":"IRCTC","amount":495.00,"date":"2025-03-22"}
+{"merchant":"IRCTC","date":"2025-03-22","total":495.00,"items":[{"name":"Base Fare","amount":455.00},{"name":"Reservation","amount":40.00}]}
 
 ---
 
@@ -397,7 +427,7 @@ Onions 2kg        ₹60
 Amount Paid: ₹95
 """
 Output:
-{"merchant":"BigBasket","amount":95.00,"date":null}
+{"merchant":"BigBasket","date":null,"total":95.00,"items":[{"name":"Tomatoes 1kg","amount":35.00},{"name":"Onions 2kg","amount":60.00}]}
 
 ## RECEIPT TO PARSE
 """
