@@ -7,6 +7,7 @@ import Insights from "./components/Insights";
 import Budgets from "./components/Budgets";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import OCRPage from "./pages/OCRPage"; // 🔥 ADD THIS
 
 import "./App.css";
 
@@ -52,78 +53,86 @@ function App() {
         <Link to="/transactions">Transactions</Link> |{" "}
         <Link to="/analytics">Analytics</Link> |{" "}
         <Link to="/insights">Insights</Link> |{" "}
+        <Link to="/budgets">Budgets</Link> |{" "}
+        <Link to="/ocr">Scan Receipt</Link> {/* 🔥 NEW LINK */} |{" "}
         <Link to="/about">About</Link> |{" "}
         <Link to="/login">Login</Link> |{" "}
-        <Link to="/register">Register</Link> |{" "}
-        <Link to="/budgets">Budgets</Link>
+        <Link to="/register">Register</Link>
       </nav>
 
       {/* 🧭 ROUTES */}
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route 
-          path="/dashboard" 
+
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/transactions" 
+
+        <Route
+          path="/transactions"
           element={
             <ProtectedRoute>
               <>
                 <AddTransaction />
-                  <Transactions />
+                <Transactions />
               </>
             </ProtectedRoute>
-          }        
+          }
         />
-        <Route 
-          path="/analytics" 
+
+        <Route
+          path="/analytics"
           element={
             <ProtectedRoute>
               <Analytics />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/insights" 
+
+        <Route
+          path="/insights"
           element={
             <ProtectedRoute>
               <Insights />
             </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/about" 
-          element={
-            <ProtectedRoute>
-              <About />
-            </ProtectedRoute> 
           }
         />
-        <Route 
-          path="/login" 
-          element={
-            <Login />
-          }
-        />
-        <Route 
-          path="/register" 
-          element={
-            <Register />
-          } 
-        />
-        <Route 
-          path="/budgets" 
+
+        <Route
+          path="/budgets"
           element={
             <ProtectedRoute>
               <Budgets />
             </ProtectedRoute>
-          } 
+          }
         />
+
+        {/* 🔥 OCR ROUTE */}
+        <Route
+          path="/ocr"
+          element={
+            <ProtectedRoute>
+              <OCRPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/about"
+          element={
+            <ProtectedRoute>
+              <About />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
       </Routes>
     </div>
   );
