@@ -1,127 +1,100 @@
 import { useState } from "react";
 import axios from "axios";
-import ReceiptReview from "./ReceiptReview";
+import ReceiptReview from "../components/ReceiptReview";
 
-function OCRUpload() {
-  const [selectedFile, setSelectedFile] = useState(null);
+function OCRPage() {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [ocrResult, setOcrResult] = useState(null);
+
   const token = localStorage.getItem("token");
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        setError("Please select an image file");
-        setSelectedFile(null);
-        return;
-      }
-      setSelectedFile(file);
-      setError(null);
-    }
+  const handleFile = (f) => {
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) {
-      setError("Please select a file first");
-      return;
-    }
+    if (!file) return alert("Upload a receipt");
 
-    setLoading(true);
-    setError(null);
+    const formData = new FormData();
+    formData.append("image", file);
 
     try {
-      const formData = new FormData();
-      formData.append("image", selectedFile);
+      setLoading(true);
 
-      const response = await axios.post("http://localhost:5000/ocr/scan", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`
+      const res = await axios.post(
+        "http://localhost:5000/ocr/scan",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data"
+          }
         }
-      });
-
-      setOcrResult(response.data);
-      setSelectedFile(null);
-    } catch (err) {
-      console.error("OCR Error:", err);
-      setError(
-        err.response?.data?.message || "Failed to process receipt. Please try again."
       );
+
+      setData(res.data);
+
+    } catch (err) {
+      console.error(err);
+      alert("Scan failed");
     } finally {
       setLoading(false);
     }
   };
 
-  if (ocrResult) {
-    return <ReceiptReview data={ocrResult} />;
-  }
-
   return (
-    <div style={{ maxWidth: 500, margin: "0 auto", padding: 20 }}>
-      <div style={{
-        border: "2px dashed #ccc",
-        borderRadius: 8,
-        padding: 40,
-        textAlign: "center",
-        backgroundColor: "#f9f9f9",
-        cursor: "pointer",
-        transition: "all 0.3s"
-      }}>
+    <div className="ocr-container">
+      {/* 🔥 Upload Zone */}
+      <div
+        className="upload-box"
+        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
+      >
+        <p>Drag & drop receipt or click to upload</p>
+
         <input
           type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          style={{ display: "none" }}
-          id="receipt-upload"
+          onChange={(e) => handleFile(e.target.files[0])}
         />
-        <label
-          htmlFor="receipt-upload"
-          style={{ cursor: "pointer", display: "block" }}
-        >
-          <div style={{ fontSize: 48, marginBottom: 10 }}>📸</div>
-          <p style={{ margin: 0, color: "#666" }}>
-            {selectedFile
-              ? `Selected: ${selectedFile.name}`
-              : "Click to select receipt image"}
-          </p>
-        </label>
       </div>
 
-      {selectedFile && (
-        <button
-          onClick={handleUpload}
-          disabled={loading}
-          style={{
-            width: "100%",
-            marginTop: 15,
-            padding: 12,
-            backgroundColor: loading ? "#ccc" : "#007bff",
-            color: "white",
-            border: "none",
-            borderRadius: 4,
-            cursor: loading ? "not-allowed" : "pointer",
-            fontSize: 16
-          }}
-        >
-          {loading ? "Processing..." : "Scan Receipt"}
-        </button>
+      {/* 👀 Preview */}
+      {preview && (
+        <div className="preview-card">
+          <img src={preview} alt="preview" />
+        </div>
       )}
 
-      {error && (
-        <div style={{
-          marginTop: 15,
-          padding: 10,
-          backgroundColor: "#f8d7da",
-          color: "#721c24",
-          borderRadius: 4
-        }}>
-          {error}
+      {/* 🚀 Button */}
+      <button className="scan-btn" onClick={handleUpload}>
+        Scan Receipt
+      </button>
+
+      {/* ⏳ Loader */}
+      {loading && (
+        <div className="loader">
+          <div className="spinner"></div>
+          <p>Analyzing your receipt...</p>
+        </div>
+      )}
+
+      {/* 🧾 Results */}
+      {data && (
+        <div className="result-card">
+          <ReceiptReview data={data} />
         </div>
       )}
     </div>
   );
 }
 
-export default OCRUpload;
+export default OCRPage;
