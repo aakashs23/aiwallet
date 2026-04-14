@@ -1,9 +1,8 @@
-const Tesseract = require("tesseract.js");
 const axios = require("axios");
 const pool = require("../config/db");
-const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
 const fs = require("fs");
+const FormData = require("form-data");
 
 exports.processReceipt = async (req, res) => {
   try {
@@ -12,77 +11,126 @@ exports.processReceipt = async (req, res) => {
     const imagePath = req.file.path;
     const processedPath = "uploads/processed-" + Date.now() + ".png";
 
+    // 🧱 0. PREPROCESS IMAGE (IMPORTANT)
     await sharp(imagePath)
-        .grayscale()
-        .normalize()
-        .sharpen()
-        .threshold(150)
-        .toFile(processedPath);
+      .resize({ width: 800 }) // 🔥 normalize size
+      .grayscale()
+      .normalize()
+      .sharpen()
+      .png({ compressionLevel: 9 })  // maximize compression
+      .toFile(processedPath);
 
-    // 🧱 1. OCR
-    const ocrResult = await Tesseract.recognize(processedPath, "eng", {
-        logger: m => console.log(m),
-        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789₹.,:- ",
-    });
-    const rawText = ocrResult.data.text;
+    // 🧱 1. OCR via Paddle (Python service)
+    const formData = new FormData();
+    formData.append("image", fs.createReadStream(processedPath));
 
-    console.log("OCR TEXT:", rawText);
+    let ocrRes;
+    try {
+      ocrRes = await axios.post(
+        "http://localhost:8001/ocr",
+        formData,
+        {
+          headers: formData.getHeaders(),
+          timeout: 120000 // 🔥 increase timeout for large receipts
+        }
+      );
+    } catch (ocrErr) {
+      if (ocrErr.code === 'ECONNREFUSED') {
+        throw new Error("OCR Service is not running on localhost:8001. Please start the OCR service.");
+      } else if (ocrErr.response?.status === 404) {
+        throw new Error("OCR endpoint /ocr not found. Check if the OCR service app.py has the /ocr endpoint.");
+      }
+      throw ocrErr;
+    }
 
+    const rawText = ocrRes.data.text;
+
+    console.log("PADDLE OCR TEXT:", rawText);
+
+    // 🧠 USER HISTORY (for classification boost)
     const historyResult = await pool.query(
       `SELECT merchant, category, times_seen
        FROM training_data
        ORDER BY times_seen DESC, last_seen_at DESC
-       LIMIT 10`,
+       LIMIT 10`
     );
+
     const userHistory = historyResult.rows.map(
       r => `${r.merchant} → ${r.category} (seen ${r.times_seen}x)`
     );
-    console.log("TRAINING HISTORY:", userHistory);
 
-    // 🔥 FALLBACK AMOUNT EXTRACTION
+    // 🔥 FALLBACK AMOUNT
     const amountMatch = rawText.match(/(total|amount)[^\d]*(\d+(\.\d+)?)/i);
     const fallbackAmount = amountMatch ? Number(amountMatch[2]) : 0;
 
+    // 🧼 CLEAN TEXT (VERY IMPORTANT FOR LLM)
     let cleanedText = rawText
-        .replace(/[^\x00-\x7F]/g, "")   // remove weird unicode
-        .replace(/\s+/g, " ")           // normalize spaces
-        .trim();
+      .replace(/[^\x00-\x7F]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
-    // 🧱 2. PARSE RECEIPT (multi-item)
-    const parseRes = await axios.post("http://localhost:5000/llm/parse-receipt", {
-      text: rawText
-    });
+    // 🧱 2. PARSE RECEIPT
+    const parseRes = await axios.post(
+      "http://localhost:5000/llm/parse-receipt",
+      {
+        text: cleanedText
+      }
+    );
 
     const parsed = parseRes.data;
 
-    // 🧱 3. CLASSIFY EACH ITEM
+    // 🧱 3. CLASSIFY ITEMS
     const items = [];
 
     for (let item of parsed.items || []) {
-      const classifyRes = await axios.post("http://localhost:5000/llm/classify", {
-      merchant: item.name,
-      amount: item.amount,
-      userHistory
-    });
+      try {
+        const classifyRes = await axios.post(
+          "http://localhost:5000/llm/classify",
+          {
+            merchant: item.name,
+            amount: item.amount,
+            userHistory
+          }
+        );
 
-    const classification = classifyRes.data.classification;
+        const classification = classifyRes.data.classification;
 
-    items.push({
-      name: item.name,
-      amount: item.amount,
-      category: classification.category,
-      confidence: classification.confidence,
-      reason: classification.reason
+        items.push({
+          name: item.name,
+          amount: item.amount,
+          category: classification.category,
+          confidence: classification.confidence,
+          reason: classification.reason
+        });
+
+      } catch (err) {
+        // 🔥 fallback if classification fails
+        items.push({
+          name: item.name,
+          amount: item.amount,
+          category: "Other",
+          confidence: 0.5,
+          reason: "Classification failed"
+        });
+      }
+    }
+
+    // 🧹 CLEANUP FILES
+    try {
+      fs.unlinkSync(imagePath);
+      fs.unlinkSync(processedPath);
+    } catch (e) {
+      console.log("Cleanup warning:", e.message);
+    }
+
+    // ✅ RESPONSE
+    res.json({
+      merchant: parsed.merchant,
+      date: parsed.date,
+      total: parsed.total || fallbackAmount,
+      items,
+      rawText
     });
-  }
-   
-  res.json({
-    merchant: parsed.merchant,
-    date: parsed.date,
-    total: parsed.total || fallbackAmount,
-    items,
-    rawText
-  }); 
 
   } catch (err) {
     console.error("OCR PIPELINE ERROR:", err);
