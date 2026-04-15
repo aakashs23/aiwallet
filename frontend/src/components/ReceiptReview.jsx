@@ -1,7 +1,13 @@
 import { useState } from "react";
 import axios from "axios";
+import { useEffect } from "react";
 
 function ReceiptReview({ data }) {
+  
+  useEffect(() => {
+    setItems(data.items || []);
+  }, [data]);
+  
   const [items, setItems] = useState(data.items || []);
   const token = localStorage.getItem("token");
 
