@@ -14,22 +14,26 @@ ocr = None
 async def startup_event():
     global ocr
     print("⏳ Loading PaddleOCR model...")
-    ocr = PaddleOCR(use_textline_orientation=True)  # show_log=False reduces noise
-    print("✅ PaddleOCR ready")
-
-    # 🔥 Warm up with a blank image so first real request is fast
-    import numpy as np
-    dummy = np.zeros((100, 100, 3), dtype=np.uint8)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-        import cv2
-        cv2.imwrite(tmp.name, dummy)
-        try:
-            ocr.predict(tmp.name)
-        except:
-            pass
-        finally:
-            os.unlink(tmp.name)
+    ocr = PaddleOCR(use_textline_orientation=True)
     
+    # 🔥 Warm up — Windows needs the file closed before unlinking
+    import numpy as np
+    import cv2
+
+    dummy = np.zeros((100, 100, 3), dtype=np.uint8)
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+            tmp_path = tmp.name
+            cv2.imwrite(tmp_path, dummy)
+        # ✅ File is now closed — safe to use and delete on Windows
+        ocr.predict(tmp_path)
+    except Exception as e:
+        print(f"Warmup warning (non-fatal): {e}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
     print("✅ PaddleOCR ready")
 
 @app.post("/ocr")

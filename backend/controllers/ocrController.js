@@ -79,40 +79,49 @@ exports.processReceipt = async (req, res) => {
 
     const parsed = parseRes.data;
 
-    // 🧱 3. CLASSIFY ITEMS
+    // 🧱 3. CLASSIFY EACH ITEM (HYBRID)
+    const { ruleBasedCategory } = require("../utils/rules");
+
     const items = [];
 
     for (let item of parsed.items || []) {
-      try {
-        const classifyRes = await axios.post(
-          "http://localhost:5000/llm/classify",
-          {
-            merchant: item.name,
+
+      let category = ruleBasedCategory(item.name);
+
+      let classification;
+
+      if (category) {
+        // ✅ RULE HIT
+        classification = {
+          category,
+          confidence: 0.95,
+          reason: "Rule-based classification"
+        };
+      } else {
+        // 🤖 LLM fallback
+        try {
+          const classifyRes = await axios.post("http://localhost:5000/llm/classify", {
+            merchant: item.name + " food item",
             amount: item.amount,
             userHistory
-          }
-        );
+          });
 
-        const classification = classifyRes.data.classification;
+          classification = classifyRes.data.classification;
 
-        items.push({
-          name: item.name,
-          amount: item.amount,
-          category: classification.category,
-          confidence: classification.confidence,
-          reason: classification.reason
-        });
-
-      } catch (err) {
-        // 🔥 fallback if classification fails
-        items.push({
-          name: item.name,
-          amount: item.amount,
-          category: "Other",
-          confidence: 0.5,
-          reason: "Classification failed"
-        });
+        } catch {
+          classification = {
+            category: "Other",
+            confidence: 0.5,
+            reason: "Fallback"
+          };
+        }
       }
+
+      items.push({
+        name: item.name,
+        amount: item.amount,
+        ...classification
+      });
     }
 
     // 🧹 CLEANUP FILES
