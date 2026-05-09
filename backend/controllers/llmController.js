@@ -1,7 +1,5 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const { callLLM } = require("../services/llmRouter");
 
 exports.listModels = async (req, res) => {
   try {
@@ -24,10 +22,6 @@ exports.classifyTransaction = async (req, res) => {
         message: "either 'texts' (raw OCR) or 'merchant' + 'amount' required"
       });
     }
-
-    const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash"
-    });
 
     // If raw text provided, parse and classify together
     if (texts) {
@@ -164,38 +158,25 @@ exports.classifyTransaction = async (req, res) => {
     Output ONLY the raw JSON object. Nothing else.
     `;
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      
-      const text = response.text();
+      // 🥇 Call LLM via router (Gemini → OpenRouter fallback)
+      let text = await callLLM(prompt);
+
+      // 🔥 Clean response
+      text = text.replace(/```json|```/g, "").trim();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
 
       let parsed;
-
       try {
-        const clean = text
-        .replace(/```json|```/g, "")
-        .trim();
-
-        const start = clean.indexOf("{");
-        const end = clean.lastIndexOf("}");
-
-        if (start === -1 || end === -1) {
-          throw new Error("No JSON found");
-        }
-
-        const jsonString = clean.substring(start, end + 1);
-
-        parsed = JSON.parse(jsonString);
-
+        if (!jsonMatch) throw new Error("No JSON found");
+        parsed = JSON.parse(jsonMatch[0]);
       } catch (err) {
         console.error("❌ JSON parse failed:", text);
-
         parsed = {
-          parsed: { merchant, amount },
+          parsed: { merchant: "Unknown", amount: 0 },
           classification: {
             category: "Other",
             confidence: 0.5,
-            reason: "Classification failed"
+            reason: "Fallback parsing failed"
           }
         };
       }
@@ -230,23 +211,25 @@ Respond with ONLY a raw JSON object (no markdown, no backticks):
 }
 `;
 
-      const result = await model.generateContent(classifyPrompt);
-      const response = await result.response;
-      const text = response.text();
+      // 🥇 Call LLM via router (Gemini → OpenRouter fallback)
+      let text = await callLLM(classifyPrompt);
+
+      // 🔥 Clean response
+      text = text.replace(/```json|```/g, "").trim();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
 
       let parsed;
-
       try {
-        parsed = JSON.parse(text);
+        if (!jsonMatch) throw new Error("No JSON found");
+        parsed = JSON.parse(jsonMatch[0]);
       } catch (err) {
         console.error("❌ JSON parse failed:", text);
-
         parsed = {
           parsed: { merchant, amount },
           classification: {
             category: "Other",
             confidence: 0.5,
-            reason: "Classification failed"
+            reason: "Fallback parsing failed"
           }
         };
       }
@@ -255,7 +238,7 @@ Respond with ONLY a raw JSON object (no markdown, no backticks):
     }
 
   } catch (err) {
-    console.error("❌ Gemini error:", err.message);
+    console.error("❌ LLM error:", err.message);
 
     res.json({
       parsed: {
@@ -274,10 +257,6 @@ Respond with ONLY a raw JSON object (no markdown, no backticks):
 exports.parseReceipt = async (req, res) => {
   try {
     const { text } = req.body;
-
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash"
-    });
 
     const structuredText = text
         .split("\n")
@@ -438,11 +417,11 @@ ${structuredText}
 Output ONLY the raw JSON object. Nothing else.
 `;
 
-    const result = await model.generateContent(prompt);
-    let output = result.response.text();
+    // 🥇 Call LLM via router (Gemini → OpenRouter fallback)
+    let output = await callLLM(prompt);
 
+    // 🔥 Clean response
     output = output.replace(/```json|```/g, "").trim();
-
     const jsonMatch = output.match(/\{[\s\S]*\}/);
 
     if (!jsonMatch) throw new Error("No JSON found");

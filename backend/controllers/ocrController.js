@@ -31,7 +31,7 @@ exports.processReceipt = async (req, res) => {
         formData,
         {
           headers: formData.getHeaders(),
-          timeout: 120000 // 🔥 increase timeout for large receipts
+          timeout: 200000 // 🔥 increase timeout for large receipts
         }
       );
     } catch (ocrErr) {
