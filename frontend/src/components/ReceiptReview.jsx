@@ -78,7 +78,7 @@ function ReceiptReview({ data }) {
       </div>
 
       {/* 🧾 Items */}
-        {items.map((item, i) => (
+      {items.map((item, i) => (
         <div
           key={i}
           style={{
@@ -87,43 +87,46 @@ function ReceiptReview({ data }) {
             marginBottom: 12,
             background: item.confidence < 0.6 ? "#fff5f5" : "white",
             boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
-            border: "1px solid #eee",
-            position: "relative" // 👈 needed for X positioning
+            border: "1px solid #eee"
           }}
         >
-        {/* ❌ Delete Button */}
-        <button
-          onClick={() => deleteItem(i)}
-            style={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              background: "#f5f5f5",
-              border: "none",
-              borderRadius: "50%",
-              width: 28,
-              height: 28,
-              cursor: "pointer",
-              fontSize: 14,
-              color: "#666",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}
-          >
-            ✕
-          </button>
 
-          {/* 🏷 Name + Amount */}
+          {/* 🏷 Name + Amount + Delete */}
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
+              alignItems: "center",
               marginBottom: 8
             }}
           >
             <b>{item.name}</b>
-            <span>₹{item.amount}</span>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        
+              {/* ❌ Delete button */}
+              <button
+                onClick={() => deleteItem(i)}
+                style={{
+                  background: "#f5f5f5",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: 26,
+                  height: 26,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  color: "#666",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                ✕
+              </button>
+
+              {/* 💰 Amount */}
+              <span>₹{item.amount}</span>
+            </div>
           </div>
 
           {/* 📂 Category */}
@@ -148,15 +151,15 @@ function ReceiptReview({ data }) {
               style={{
                 background:
                   item.confidence > 0.8
-                  ? "#e6fffa"
-                  : item.confidence > 0.6
-                  ? "#fff7e6"
-                  : "#ffe6e6",
-                color: getConfidenceColor(item.confidence),
-                padding: "4px 8px",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: "bold"
+                    ? "#e6fffa"
+                    : item.confidence > 0.6
+                    ? "#fff7e6"
+                    : "#ffe6e6",
+                  color: getConfidenceColor(item.confidence),
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: "bold"
               }}
             >
               {(item.confidence * 100).toFixed(0)}% confidence
