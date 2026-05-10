@@ -31,6 +31,12 @@ function ReceiptReview({ data }) {
     setItems(updated);
   };
 
+  // ❌ Delete item
+  const deleteItem = (index) => {
+    const updated = items.filter((_, i) => i !== index);
+    setItems(updated);
+  };
+
   // 💾 Save
   const handleSave = async () => {
     try {
@@ -84,14 +90,43 @@ function ReceiptReview({ data }) {
             border: "1px solid #eee"
           }}
         >
-          {/* 🏷 Name + Amount */}
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 8
-          }}>
+
+          {/* 🏷 Name + Amount + Delete */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8
+            }}
+          >
             <b>{item.name}</b>
-            <span>₹{item.amount}</span>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        
+              {/* ❌ Delete button */}
+              <button
+                onClick={() => deleteItem(i)}
+                style={{
+                  background: "#f5f5f5",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: 26,
+                  height: 26,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  color: "#666",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                ✕
+              </button>
+
+              {/* 💰 Amount */}
+              <span>₹{item.amount}</span>
+            </div>
           </div>
 
           {/* 📂 Category */}
@@ -105,7 +140,7 @@ function ReceiptReview({ data }) {
               marginBottom: 10
             }}
           >
-            {categories.map(c => (
+            {categories.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>
@@ -120,11 +155,11 @@ function ReceiptReview({ data }) {
                     : item.confidence > 0.6
                     ? "#fff7e6"
                     : "#ffe6e6",
-                color: getConfidenceColor(item.confidence),
-                padding: "4px 8px",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: "bold"
+                  color: getConfidenceColor(item.confidence),
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: "bold"
               }}
             >
               {(item.confidence * 100).toFixed(0)}% confidence
@@ -133,19 +168,19 @@ function ReceiptReview({ data }) {
 
           {/* ⚠ Low confidence warning */}
           {item.confidence < 0.6 && (
-            <div style={{
-              color: "red",
-              fontSize: 12,
-              marginBottom: 6
-            }}>
+            <div
+              style={{
+                color: "red",
+                fontSize: 12,
+                marginBottom: 6
+              }}
+            >
               ⚠ Needs review
             </div>
           )}
 
           {/* 🧠 Reason */}
-          <small style={{ color: "#666" }}>
-            {item.reason}
-          </small>
+          <small style={{ color: "#666" }}>{item.reason}</small>
         </div>
       ))}
 
