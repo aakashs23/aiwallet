@@ -31,6 +31,12 @@ function ReceiptReview({ data }) {
     setItems(updated);
   };
 
+  // ❌ Delete item
+  const deleteItem = (index) => {
+    const updated = items.filter((_, i) => i !== index);
+    setItems(updated);
+  };
+
   // 💾 Save
   const handleSave = async () => {
     try {
@@ -72,7 +78,7 @@ function ReceiptReview({ data }) {
       </div>
 
       {/* 🧾 Items */}
-      {items.map((item, i) => (
+        {items.map((item, i) => (
         <div
           key={i}
           style={{
@@ -81,15 +87,41 @@ function ReceiptReview({ data }) {
             marginBottom: 12,
             background: item.confidence < 0.6 ? "#fff5f5" : "white",
             boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
-            border: "1px solid #eee"
+            border: "1px solid #eee",
+            position: "relative" // 👈 needed for X positioning
           }}
         >
+        {/* ❌ Delete Button */}
+        <button
+          onClick={() => deleteItem(i)}
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              background: "#f5f5f5",
+              border: "none",
+              borderRadius: "50%",
+              width: 28,
+              height: 28,
+              cursor: "pointer",
+              fontSize: 14,
+              color: "#666",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+          >
+            ✕
+          </button>
+
           {/* 🏷 Name + Amount */}
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 8
-          }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: 8
+            }}
+          >
             <b>{item.name}</b>
             <span>₹{item.amount}</span>
           </div>
@@ -105,7 +137,7 @@ function ReceiptReview({ data }) {
               marginBottom: 10
             }}
           >
-            {categories.map(c => (
+            {categories.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>
@@ -116,10 +148,10 @@ function ReceiptReview({ data }) {
               style={{
                 background:
                   item.confidence > 0.8
-                    ? "#e6fffa"
-                    : item.confidence > 0.6
-                    ? "#fff7e6"
-                    : "#ffe6e6",
+                  ? "#e6fffa"
+                  : item.confidence > 0.6
+                  ? "#fff7e6"
+                  : "#ffe6e6",
                 color: getConfidenceColor(item.confidence),
                 padding: "4px 8px",
                 borderRadius: 6,
@@ -133,19 +165,19 @@ function ReceiptReview({ data }) {
 
           {/* ⚠ Low confidence warning */}
           {item.confidence < 0.6 && (
-            <div style={{
-              color: "red",
-              fontSize: 12,
-              marginBottom: 6
-            }}>
+            <div
+              style={{
+                color: "red",
+                fontSize: 12,
+                marginBottom: 6
+              }}
+            >
               ⚠ Needs review
             </div>
           )}
 
           {/* 🧠 Reason */}
-          <small style={{ color: "#666" }}>
-            {item.reason}
-          </small>
+          <small style={{ color: "#666" }}>{item.reason}</small>
         </div>
       ))}
 
