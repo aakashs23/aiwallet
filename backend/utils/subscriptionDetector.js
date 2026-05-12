@@ -14,6 +14,42 @@ exports.detectSubscriptions = (transactions) => {
   const subscriptions = [];
 
   for (let merchant in map) {
+    
+    const subscriptionKeywords = [
+        // 🎬 Streaming
+        "netflix", "spotify", "apple music", "youtube", "youtube premium",
+        "prime", "amazon prime", "hotstar", "disney", "zee5",
+        "sony liv", "aha", "voot", "mx player",
+
+        // ☁️ Cloud / Storage
+        "google", "google one", "icloud", "dropbox", "onedrive",
+
+        // 🧑‍💻 Software / SaaS
+        "adobe", "figma", "notion", "chatgpt", "openai",
+        "canva", "zoom", "slack", "github", "gitlab",
+
+        // 📰 News / Content
+        "medium", "substack", "times", "nytimes", "economist",
+
+        // 🎧 Audio / Learning
+        "audible", "udemy", "coursera", "byju", "unacademy",
+
+        // 🏋️ Lifestyle / Fitness
+        "cult", "cultfit", "fitpass", "healthify",
+
+        // 📱 App stores / digital billing
+        "apple.com/bill", "apple bill", "google play", "play store",
+
+        // 💳 Telecom / utilities (some are subscriptions)
+        "jio", "airtel", "vi", "vodafone",
+
+        // 🧾 Misc recurring services
+        "membership", "subscription", "plan", "auto debit"
+    ];
+
+    const isLikelySubscription = (merchant) =>
+        subscriptionKeywords.some(k => merchant.includes(k));
+
     const txs = map[merchant];
 
     if (txs.length < 2) continue; // minimum 2 to detect pattern
@@ -58,6 +94,22 @@ exports.detectSubscriptions = (transactions) => {
       new Date(lastPaid) <= new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
         ? "unused"
         : "active";
+
+    // ❌ Reject very frequent merchants (daily usage)
+    if (txs.length > 6) continue;
+
+    // ❌ Reject if amounts vary too much
+    const amounts = txs.map(t => Number(t.amount || 0));
+    const uniqueAmounts = [...new Set(amounts)];
+    if (uniqueAmounts.length > 2) continue;
+
+    
+    // ❌ Reject if interval is too inconsistent
+    if (!intervals.length || avgInterval < 5) continue;
+
+    
+    // If not keyword AND weak pattern → skip
+    if (!isLikelySubscription(merchant) && txs.length < 3) continue;
 
     subscriptions.push({
       merchant,

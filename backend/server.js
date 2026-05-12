@@ -27,6 +27,7 @@ app.use("/ml", mlRoutes);
 app.use("/insights", insightsRoutes);
 app.use("/llm", llmRoutes);
 app.use("/ocr", ocrRoutes);
+app.use("/subscriptions", require("./routes/subscriptionRoutes"));
 
 app.get("/", (req, res) => {
   res.send("AI Wallet API running 🚀");

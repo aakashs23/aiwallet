@@ -359,7 +359,7 @@ exports.detectSubscriptions = async (req, res) => {
     await syncSubscriptions(userId, transactions);
 
     const storedSubs = await pool.query(
-      `SELECT s.merchant, s.avg_amount, s.billing_cycle, s.next_due, s.status,
+      `SELECT s.id, s.merchant, s.avg_amount, s.billing_cycle, s.next_due, s.status,
               COUNT(t.*) AS occurrence_count
        FROM subscriptions s
        LEFT JOIN transactions t
@@ -378,6 +378,7 @@ exports.detectSubscriptions = async (req, res) => {
         : `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} ago`;
 
       return {
+        id: sub.id,
         merchant: sub.merchant,
         avg_amount: sub.avg_amount,
         billing_cycle: sub.billing_cycle,
@@ -388,6 +389,27 @@ exports.detectSubscriptions = async (req, res) => {
       };
     }));
 
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error");
+  }
+};
+
+exports.deleteSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+
+    const result = await pool.query(
+      `DELETE FROM subscriptions WHERE id = $1 AND user_id = $2 RETURNING *`,
+      [id, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Subscription not found" });
+    }
+
+    res.json({ message: "Subscription deleted" });
   } catch (err) {
     console.error(err);
     res.status(500).send("Server error");

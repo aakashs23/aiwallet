@@ -9,6 +9,7 @@ const {
   addTransaction,
   getTransactions,
   deleteTransaction,
+  deleteSubscription,
   updateTransaction,
   bulkAddTransactions
 } = require("../controllers/transactionController");
@@ -16,9 +17,10 @@ const {
 router.post("/bulk", authMiddleware, bulkAddTransactions);
 router.post("/", authMiddleware, addTransaction);
 router.get("/", authMiddleware, getTransactions);
-router.delete("/:id", authMiddleware, deleteTransaction);
 router.get("/anomalies", authMiddleware, detectAnomalies);
 router.get("/subscriptions", authMiddleware, detectSubscriptions);
+router.delete("/subscriptions/:id", authMiddleware, deleteSubscription);
+router.delete("/:id", authMiddleware, deleteTransaction);
 
 router.put("/:id", authMiddleware, updateTransaction);
 
