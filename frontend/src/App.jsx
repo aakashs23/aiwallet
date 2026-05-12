@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Routes, Route, Link } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Transactions from "./components/Transactions";
@@ -8,6 +9,7 @@ import Budgets from "./components/Budgets";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import OCRPage from "./pages/OCRPage"; // 🔥 ADD THIS
+import Subscriptions from "./pages/Subscriptions";
 
 import "./App.css";
 
@@ -43,6 +45,8 @@ function About() {
 }
 
 function App() {
+  const [refreshTransactions, setRefreshTransactions] = useState(0);
+
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
 
@@ -57,7 +61,8 @@ function App() {
         <Link to="/ocr">Scan Receipt</Link> {/* 🔥 NEW LINK */} |{" "}
         <Link to="/about">About</Link> |{" "}
         <Link to="/login">Login</Link> |{" "}
-        <Link to="/register">Register</Link>
+        <Link to="/register">Register</Link> |{" "}
+        <Link to="/subscriptions">Subscriptions</Link>
       </nav>
 
       {/* 🧭 ROUTES */}
@@ -78,8 +83,8 @@ function App() {
           element={
             <ProtectedRoute>
               <>
-                <AddTransaction />
-                <Transactions />
+                <AddTransaction refresh={() => setRefreshTransactions((prev) => prev + 1)} />
+                <Transactions refreshTrigger={refreshTransactions} />
               </>
             </ProtectedRoute>
           }
@@ -127,6 +132,15 @@ function App() {
           element={
             <ProtectedRoute>
               <About />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/subscriptions"
+          element={
+            <ProtectedRoute>
+              <Subscriptions />
             </ProtectedRoute>
           }
         />

@@ -2,10 +2,69 @@ const pool = require("../config/db");
 const { v4: uuidv4 } = require("uuid");
 const axios = require("axios");
 const { ruleBasedCategory } = require("../utils/categorizer");
+const { detectSubscriptions } = require("../utils/subscriptionDetector");
+
+const SUBSCRIPTION_UNUSED_AFTER_DAYS = 45;
+
+async function syncSubscriptions(userId, transactions) {
+  const subs = detectSubscriptions(transactions);
+  const merchants = subs.map((sub) => sub.merchant);
+
+  for (let sub of subs) {
+    const nextDue = new Date(sub.lastPaid);
+    nextDue.setDate(nextDue.getDate() + Math.round(sub.avgInterval || 30));
+
+    try {
+      await pool.query(
+        `INSERT INTO subscriptions 
+        (id, user_id, merchant, avg_amount, billing_cycle, last_paid, next_due, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (user_id, merchant) 
+        DO UPDATE SET 
+          avg_amount = EXCLUDED.avg_amount,
+          billing_cycle = EXCLUDED.billing_cycle,
+          last_paid = EXCLUDED.last_paid,
+          next_due = EXCLUDED.next_due,
+          status = EXCLUDED.status`,
+        [
+          uuidv4(),
+          userId,
+          sub.merchant,
+          sub.avgAmount,
+          sub.billing_cycle,
+          sub.lastPaid,
+          nextDue.toISOString(),
+          sub.status
+        ]
+      );
+    } catch (err) {
+      console.error("Error upserting subscription:", err.message);
+    }
+  }
+
+  if (merchants.length > 0) {
+    await pool.query(
+      `UPDATE subscriptions
+       SET status = 'unused'
+       WHERE user_id = $1
+         AND merchant NOT IN (${merchants.map((_, i) => `$${i + 2}`).join(", ")})
+         AND last_paid < NOW() - INTERVAL '${SUBSCRIPTION_UNUSED_AFTER_DAYS} days'`,
+      [userId, ...merchants]
+    );
+  } else {
+    await pool.query(
+      `UPDATE subscriptions
+       SET status = 'unused'
+       WHERE user_id = $1
+         AND last_paid < NOW() - INTERVAL '${SUBSCRIPTION_UNUSED_AFTER_DAYS} days'`,
+      [userId]
+    );
+  }
+}
 
 exports.addTransaction = async (req, res) => {
   try {
-    const { amount, merchant } = req.body;
+    const { amount, merchant, date } = req.body;
 
     if (!amount || !merchant) {
       return res.status(400).json({
@@ -94,11 +153,19 @@ exports.addTransaction = async (req, res) => {
       }
     }
 
-    // 🔥 FIXED INSERT (reason included)
+    const needsFeedback = result.confidence < 0.6;
+    const finalReason =
+      result.reason ||
+      (needsFeedback
+        ? "Low confidence categorization - please verify"
+        : "Categorized automatically");
+
+    const finalDate = date || new Date().toISOString().split("T")[0];
+
     const dbResult = await pool.query(
       `INSERT INTO transactions
-      (id, user_id, amount, category, merchant, confidence, source, reason)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      (id, user_id, amount, category, merchant, transaction_date, confidence, source, reason)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *`,
       [
         uuidv4(),
@@ -106,9 +173,10 @@ exports.addTransaction = async (req, res) => {
         amount,
         result.category,
         merchant,
+        finalDate,
         result.confidence,
         result.source,
-        finalReason   // ✅ FIX HERE
+        finalReason
       ]
     );
 
@@ -146,6 +214,20 @@ exports.addTransaction = async (req, res) => {
 
     if (needsFeedback) {
       feedbackMessage = "Not sure about this. Please confirm category.";
+    }
+
+    const transactionRows = await pool.query(
+      `SELECT merchant, amount, transaction_date as date
+       FROM transactions
+       WHERE user_id = $1
+       ORDER BY merchant, date`,
+      [userId]
+    );
+
+    try {
+      await syncSubscriptions(userId, transactionRows.rows);
+    } catch (syncErr) {
+      console.error("Subscription sync failed after addTransaction:", syncErr.message);
     }
 
     res.json({
@@ -266,66 +348,45 @@ exports.detectSubscriptions = async (req, res) => {
     const userId = req.user.userId;
 
     const result = await pool.query(
-      `SELECT merchant, amount, transaction_date, reason
+      `SELECT merchant, amount, transaction_date as date
        FROM transactions
        WHERE user_id = $1
-       ORDER BY merchant, transaction_date`,
+       ORDER BY merchant, date`,
       [userId]
     );
 
     const transactions = result.rows;
+    await syncSubscriptions(userId, transactions);
 
-    const grouped = {};
+    const storedSubs = await pool.query(
+      `SELECT s.merchant, s.avg_amount, s.billing_cycle, s.next_due, s.status,
+              COUNT(t.*) AS occurrence_count
+       FROM subscriptions s
+       LEFT JOIN transactions t
+         ON t.user_id = s.user_id
+         AND lower(t.merchant) = lower(s.merchant)
+       WHERE s.user_id = $1
+       GROUP BY s.id
+       ORDER BY s.next_due`,
+      [userId]
+    );
 
-    // group by merchant + amount
-    transactions.forEach(tx => {
-      const key = `${tx.merchant}-${tx.amount}`;
+    res.json(storedSubs.rows.map(sub => {
+      const diffDays = Math.ceil((new Date(sub.next_due) - new Date()) / (1000 * 60 * 60 * 24));
+      const next_due_label = diffDays >= 0
+        ? `in ${diffDays} day${diffDays === 1 ? "" : "s"}`
+        : `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} ago`;
 
-      if (!grouped[key]) {
-        grouped[key] = [];
-      }
-
-      grouped[key].push(new Date(tx.transaction_date));
-    });
-
-    const subscriptions = [];
-
-    for (let key in grouped) {
-      const dates = grouped[key];
-
-      if (dates.length < 2) continue;
-
-      // sort dates
-      dates.sort((a, b) => a - b);
-
-      // check intervals
-      let intervals = [];
-
-      for (let i = 1; i < dates.length; i++) {
-        const diffDays =
-          (dates[i] - dates[i - 1]) / (1000 * 60 * 60 * 24);
-
-        intervals.push(diffDays);
-      }
-
-      // check if intervals are ~30 days
-      const isMonthly = intervals.every(
-        d => d > 25 && d < 35
-      );
-
-      if (isMonthly) {
-        const [merchant, amount] = key.split("-");
-
-        subscriptions.push({
-          merchant,
-          amount,
-          billing_cycle: "monthly",
-          message: `${merchant} subscription detected (~₹${amount}/month)`
-        });
-      }
-    }
-
-    res.json(subscriptions);
+      return {
+        merchant: sub.merchant,
+        avg_amount: sub.avg_amount,
+        billing_cycle: sub.billing_cycle,
+        next_due: sub.next_due,
+        next_due_label,
+        occurrence_count: Number(sub.occurrence_count || 0),
+        status: sub.status
+      };
+    }));
 
   } catch (err) {
     console.error(err);
@@ -393,7 +454,7 @@ exports.bulkAddTransactions = async (req, res) => {
     const savedTransactions = [];
 
     for (const item of items) {
-      const { name, amount, category, confidence, reason } = item;
+      const { name, amount, category, confidence, reason, date } = item;
 
       if (!amount || !category) {
         continue;
@@ -402,8 +463,8 @@ exports.bulkAddTransactions = async (req, res) => {
       try {
         const dbResult = await pool.query(
           `INSERT INTO transactions
-          (id, user_id, amount, category, merchant, confidence, source, reason)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          (id, user_id, amount, category, merchant, transaction_date, confidence, source, reason)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
           RETURNING *`,
           [
             uuidv4(),
@@ -411,6 +472,7 @@ exports.bulkAddTransactions = async (req, res) => {
             amount,
             category,
             name || merchant || "Receipt Item",
+            date || new Date(),
             confidence || 0.8,
             "ocr",
             reason || "From receipt scan"
@@ -432,6 +494,20 @@ exports.bulkAddTransactions = async (req, res) => {
       } catch (err) {
         console.error("Error inserting item:", err.message);
       }
+    }
+
+    const transactionRows = await pool.query(
+      `SELECT merchant, amount, transaction_date as date
+       FROM transactions
+       WHERE user_id = $1
+       ORDER BY merchant, date`,
+      [userId]
+    );
+
+    try {
+      await syncSubscriptions(userId, transactionRows.rows);
+    } catch (syncErr) {
+      console.error("Subscription sync failed after bulkAddTransactions:", syncErr.message);
     }
 
     res.json({
