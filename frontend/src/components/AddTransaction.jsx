@@ -1,25 +1,30 @@
 import { useState } from "react";
 import axios from "axios";
 
-function AddTransaction({ refresh }) {
+function AddTransaction({ refresh = () => {} }) {
   const [amount, setAmount] = useState("");
   const [merchant, setMerchant] = useState("");
+  const [date, setDate] = useState("");
   const token = localStorage.getItem("token");
   const handleSubmit = async () => {
-    await axios.post(
-      
-      "http://localhost:5000/transactions",
-      { amount, merchant },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
+    try {
+      await axios.post(
+        "http://localhost:5000/transactions",
+        { amount, merchant, date },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         }
-      }
-    );
-
-    setAmount("");
-    setMerchant("");
-    refresh();
+      );
+      setDate("");
+      setAmount("");
+      setMerchant("");
+      refresh();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add transaction. Check the console for details.");
+    }
   };
 
   return (
@@ -36,6 +41,12 @@ function AddTransaction({ refresh }) {
         placeholder="Merchant"
         value={merchant}
         onChange={(e) => setMerchant(e.target.value)}
+      />
+   
+      <input
+        type="date"
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
       />
 
       <button onClick={handleSubmit}>Add</button>

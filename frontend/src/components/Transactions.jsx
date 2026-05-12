@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-function Transactions() {
+function Transactions({ refreshTrigger }) {
   const [transactions, setTransactions] = useState([]);
   const token = localStorage.getItem("token");
   const fetchTransactions = async () => {
@@ -16,7 +16,7 @@ function Transactions() {
 
   useEffect(() => {
     fetchTransactions();
-  }, []);
+  }, [refreshTrigger]);
 
   const updateCategory = async (id, category) => {
     await axios.put(
@@ -24,7 +24,7 @@ function Transactions() {
       { category },
       {
         headers: {
-          Authorization: "Bearer YOUR_TOKEN"
+          Authorization: `Bearer ${token}`
         }
       }
     );
@@ -40,8 +40,9 @@ function Transactions() {
         <div key={tx.id} style={{ border: "1px solid #ccc", margin: 10, padding: 10 }}>
           
           <p><b>Merchant:</b> {tx.merchant}</p>
-          <p><b>Category:</b> {tx.category}</p>
-
+          <p><b>Category:</b> {tx.category}</p> 
+          <p><b>Date:</b> {new Date(tx.date).toDateString()}</p>
+          <p><b>Amount:</b> ₹{tx.amount}</p>
           <p><b>Confidence:</b> {tx.confidence} ({tx.confidence_label})</p>
           <p><b>Source:</b> {tx.source}</p>
           <p><b>Reason:</b> {tx.reason}</p>
