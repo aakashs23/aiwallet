@@ -257,11 +257,24 @@ exports.getTransactions = async (req, res) => {
     const userId = req.user.userId;
 
     const result = await pool.query(
-      "SELECT * FROM transactions WHERE user_id=$1 ORDER BY transaction_date DESC",
+      `SELECT *, COALESCE(transaction_date, created_at) AS effective_date
+       FROM transactions
+       WHERE user_id=$1
+       ORDER BY effective_date DESC`,
       [userId]
     );
 
-    res.json(result.rows);
+    const transactions = result.rows.map((tx) => ({
+      ...tx,
+      merchant: tx.merchant || tx.name || "Unknown",
+      amount: Number(tx.amount || 0),
+      category: tx.category || "Other",
+      date: tx.date || (tx.transaction_date ? new Date(tx.transaction_date).toISOString().split("T")[0] : null)
+    }));
+
+    console.log(`Transactions API response for user ${userId}: ${transactions.length} rows`);
+
+    res.json(transactions);
 
   } catch (err) {
     console.error(err);
@@ -473,12 +486,17 @@ exports.bulkAddTransactions = async (req, res) => {
       });
     }
 
+    console.log(`[BULK TXN] Starting save for ${items.length} items for user ${userId}`);
+
     const savedTransactions = [];
+    let skippedCount = 0;
 
     for (const item of items) {
       const { name, amount, category, confidence, reason, date } = item;
 
       if (!amount || !category) {
+        console.warn(`[BULK TXN] Skipping item: name=${name}, amount=${amount}, category=${category}`);
+        skippedCount++;
         continue;
       }
 
@@ -502,21 +520,25 @@ exports.bulkAddTransactions = async (req, res) => {
         );
 
         savedTransactions.push(dbResult.rows[0]);
+        console.log(`[BULK TXN] Saved transaction: ${name} - ${amount} (${category})`);
 
-        // 🔥 AUTO SEND TO ML TRAINING
+        // 🔥 AUTO SEND TO ML TRAINING (non-blocking)
         try {
           const base = (name || merchant || "item").toLowerCase();
           await axios.post("http://localhost:5000/ml/train", [
             { merchant: base, category }
           ]);
+          console.log(`[ML TRAIN] Training data saved for merchant: ${base}`);
         } catch (err) {
-          console.error("ML training failed:", err.message);
+          console.warn(`[ML TRAIN] Training failed for ${name} (${base}): ${err.message}`);
         }
 
       } catch (err) {
-        console.error("Error inserting item:", err.message);
+        console.error(`[BULK TXN] Error inserting item "${name}": ${err.message}`);
       }
     }
+
+    console.log(`[BULK TXN] Saved ${savedTransactions.length} transactions, skipped ${skippedCount}`);
 
     const transactionRows = await pool.query(
       `SELECT merchant, amount, transaction_date as date
@@ -534,11 +556,12 @@ exports.bulkAddTransactions = async (req, res) => {
 
     res.json({
       message: `Successfully saved ${savedTransactions.length} transactions`,
-      transactions: savedTransactions
+      transactions: savedTransactions,
+      skipped: skippedCount
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("[BULK TXN] Unexpected error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

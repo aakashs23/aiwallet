@@ -3,12 +3,20 @@ import axios from "axios";
 import { useEffect } from "react";
 
 function ReceiptReview({ data }) {
-  
+  const normalizeItem = (item) => ({
+    name: item.name || item.merchant || "Unknown",
+    amount: Number(item.amount || 0),
+    category: item.category || "Other",
+    date: item.date || item.transaction_date || new Date().toISOString().split("T")[0],
+    confidence: item.confidence ?? 0.8,
+    reason: item.reason || "Parsed from OCR"
+  });
+
   useEffect(() => {
-    setItems(data.items || []);
+    setItems((data.items || []).map(normalizeItem));
   }, [data]);
   
-  const [items, setItems] = useState(data.items || []);
+  const [items, setItems] = useState((data.items || []).map(normalizeItem));
   const token = localStorage.getItem("token");
 
   const categories = [
@@ -39,6 +47,15 @@ function ReceiptReview({ data }) {
 
   // 💾 Save
   const handleSave = async () => {
+    if (data?.alreadySaved) {
+      window.dispatchEvent(new Event("transactionsUpdated"));
+      return alert("This bank statement has already been saved to your transactions.");
+    }
+
+    if (!token) {
+      return alert("Login required to save transactions.");
+    }
+
     try {
       await axios.post(
         "http://localhost:5000/transactions/bulk",
@@ -48,16 +65,22 @@ function ReceiptReview({ data }) {
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
           }
         }
       );
 
+      window.dispatchEvent(new Event("transactionsUpdated"));
       alert("Saved successfully");
 
     } catch (err) {
       console.error(err);
-      alert("Save failed");
+      if (err.response?.status === 401) {
+        alert("Save failed: authentication required. Please log in again.");
+      } else {
+        alert("Save failed: " + (err.response?.data?.message || err.message || "Unknown error"));
+      }
     }
   };
 
@@ -74,7 +97,7 @@ function ReceiptReview({ data }) {
         boxShadow: "0 2px 10px rgba(0,0,0,0.05)"
       }}>
         <p><b>Merchant:</b> {data.merchant}</p>
-        <p><b>Total:</b> ₹{data.total}</p>
+        <p><b>Total:</b> ₹{Number(data.total || 0).toFixed(2)}</p>
       </div>
 
       {/* 🧾 Items */}
@@ -125,7 +148,7 @@ function ReceiptReview({ data }) {
               </button>
 
               {/* 💰 Amount */}
-              <span>₹{item.amount}</span>
+              <span>₹{Number(item.amount || 0).toFixed(2)}</span>
             </div>
           </div>
 
@@ -184,24 +207,37 @@ function ReceiptReview({ data }) {
         </div>
       ))}
 
+      {data?.alreadySaved && (
+        <div style={{
+          marginBottom: 12,
+          padding: 12,
+          borderRadius: 10,
+          background: "#eef7ff",
+          color: "#055160"
+        }}>
+          This bank statement has already been saved. No further save is required.
+        </div>
+      )}
+
       {/* 💾 Sticky Save Button */}
       <button
         onClick={handleSave}
+        disabled={data?.alreadySaved}
         style={{
           position: "sticky",
           bottom: 10,
           width: "100%",
           padding: 15,
-          background: "linear-gradient(135deg, #4CAF50, #2ecc71)",
+          background: data?.alreadySaved ? "#999" : "linear-gradient(135deg, #4CAF50, #2ecc71)",
           color: "white",
           border: "none",
           borderRadius: 10,
           fontWeight: "bold",
           marginTop: 20,
-          cursor: "pointer"
+          cursor: data?.alreadySaved ? "not-allowed" : "pointer"
         }}
       >
-        💾 Save All Transactions
+        {data?.alreadySaved ? "Already Saved" : "💾 Save All Transactions"}
       </button>
     </div>
   );

@@ -20,21 +20,25 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The service will start on `http://localhost:8000`
+The service will start on `http://localhost:8001`
 
 ### 3. Verify It's Running
-- Health check: `http://localhost:8000/health` (returns `{"status": "healthy", "service": "OCR"}`)
-- Swagger docs: `http://localhost:8000/docs`
+- Health check: `http://localhost:8001/health` (returns `{"status": "healthy", "service": "OCR"}`)
+- Swagger docs: `http://localhost:8001/docs`
 
 ## Endpoints
 
 ### POST /ocr
-**Extracts text from an image using PaddleOCR**
+**Extracts text from an image or PDF using PaddleOCR**
 
 Request:
 - Method: POST
 - Content-Type: multipart/form-data
-- Body: Form field named "image" with image file
+- Body: Form field named "image" with image or PDF file
+
+Notes:
+- PDF support requires `poppler` to be installed on your system.
+- Set `POPPLER_PATH` to the poppler binary folder if it is not available on your PATH.
 
 Response:
 ```json

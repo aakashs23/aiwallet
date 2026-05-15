@@ -44,8 +44,11 @@ function OCRPage() {
       setData(res.data);
 
     } catch (err) {
-      console.error(err);
-      alert("Scan failed");
+      console.error("OCR upload error:", err.response?.data || err.message || err);
+      alert(
+        "Scan failed: " +
+          (err.response?.data?.detail || err.response?.data?.message || err.message || "Unknown error")
+      );
     } finally {
       setLoading(false);
     }

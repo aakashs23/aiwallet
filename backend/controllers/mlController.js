@@ -13,7 +13,12 @@ exports.saveTrainingData = async (req, res) => {
 
     await pool.query(
       `INSERT INTO training_data (id, merchant, category)
-       VALUES ($1, $2, $3)`,
+       VALUES ($1, $2, $3)
+       ON CONFLICT (merchant) 
+       DO UPDATE SET 
+         category = EXCLUDED.category,
+         times_seen = training_data.times_seen + 1,
+         last_seen_at = NOW()`,
       [uuidv4(), merchant.toLowerCase(), category]
     );
 
@@ -38,7 +43,13 @@ exports.trainModel = async (req, res) => {
       if (!merchant || !category) continue;
 
       await pool.query(
-        "INSERT INTO training_data (id, merchant, category) VALUES ($1, $2, $3)",
+        `INSERT INTO training_data (id, merchant, category) 
+         VALUES ($1, $2, $3)
+         ON CONFLICT (merchant) 
+         DO UPDATE SET 
+           category = EXCLUDED.category,
+           times_seen = training_data.times_seen + 1,
+           last_seen_at = NOW()`,
         [uuidv4(), merchant.toLowerCase(), category]
       );
     }
